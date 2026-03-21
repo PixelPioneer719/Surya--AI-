@@ -7,8 +7,8 @@
 const https = require('https');
 
 // InsForge API config
-const INSFORGE_BASE = 'https://rme548ii.ap-southeast.insforge.app';
-const INSFORGE_API_KEY = 'ik_7620eb1429dc9d3ac5cb459ba092e564';
+const INSFORGE_BASE = process.env.INSFORGE_BASE || 'https://rme548ii.ap-southeast.insforge.app';
+const INSFORGE_API_KEY = process.env.INSFORGE_API_KEY || 'ik_7620eb1429dc9d3ac5cb459ba092e564';
 
 const MODELS = {
   general: 'anthropic/claude-opus-4.6',
