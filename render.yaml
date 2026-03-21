@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: surya-ai
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: SMTP_EMAIL
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+    disk:
+      name: surya-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1

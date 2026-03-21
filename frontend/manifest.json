@@ -1,0 +1,23 @@
+{
+  "name": "Surya AI — Free AI Assistant",
+  "short_name": "Surya AI",
+  "description": "Powerful free AI assistant for coding, research, web search, image generation and more.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#e8550f",
+  "orientation": "any",
+  "categories": ["productivity", "utilities", "education"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
