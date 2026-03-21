@@ -1354,6 +1354,30 @@
     }
 
     .file-bar-close:hover { color: var(--error); }
+
+    /* Drag & Drop overlay */
+    .drop-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .drop-overlay.active { display: flex; }
+    .drop-overlay-inner {
+      border: 3px dashed var(--accent);
+      border-radius: 24px;
+      padding: 60px 80px;
+      text-align: center;
+      background: var(--bg-elevated);
+    }
+    .drop-overlay-inner .material-symbols-outlined { font-size: 48px; color: var(--accent); margin-bottom: 12px; }
+    .drop-overlay-inner p { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+    .drop-overlay-inner span { font-size: 13px; color: var(--text-secondary); }
     .file-bar-close .material-symbols-outlined { font-size: 18px; }
 
     .textarea-wrapper { display: flex; align-items: flex-end; }
@@ -2459,6 +2483,15 @@
   <!-- Hidden file input -->
   <input type="file" id="fileInput" style="display:none" />
 
+  <!-- Drop overlay -->
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-overlay-inner">
+      <span class="material-symbols-outlined">cloud_upload</span>
+      <p>Drop your file here</p>
+      <span>Images, code, documents</span>
+    </div>
+  </div>
+
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -3409,6 +3442,68 @@ Rules:
       document.getElementById('fileBarContainer').innerHTML = '';
       toggleSend();
     }
+
+    // ═══════════════════════════════════════════════════
+    //  PASTE & DRAG-DROP FILE SUPPORT
+    // ═══════════════════════════════════════════════════
+    const messageInput = document.getElementById('messageInput');
+    const dropOverlay = document.getElementById('dropOverlay');
+    let dragCounter = 0;
+
+    // Paste images from clipboard (Ctrl+V / Cmd+V)
+    messageInput.addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          if (requireAuth('file uploads')) return;
+          const file = item.getAsFile();
+          if (file) {
+            attachedFile = file;
+            renderFileBar(file);
+            toggleSend();
+          }
+          return;
+        }
+      }
+    });
+
+    // Drag & Drop support
+    document.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      if (e.dataTransfer?.types?.includes('Files')) {
+        dropOverlay.classList.add('active');
+      }
+    });
+
+    document.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        dropOverlay.classList.remove('active');
+      }
+    });
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dropOverlay.classList.remove('active');
+      if (requireAuth('file uploads')) return;
+      const file = e.dataTransfer?.files?.[0];
+      if (file) {
+        attachedFile = file;
+        renderFileBar(file);
+        toggleSend();
+        messageInput.focus();
+      }
+    });
 
     // ═══════════════════════════════════════════════════
     //  CHAT MANAGEMENT
@@ -4839,8 +4934,8 @@ Rules:
     //  3D WELCOME PAGE — Particle Canvas + Logic
     // ═══════════════════════════════════════════════════
     (function initWelcome() {
-      // Skip welcome if user has seen it before
-      if (sessionStorage.getItem('surya_welcome_seen')) {
+      // Skip welcome if user has seen it before OR is already logged in
+      if (localStorage.getItem('surya_welcome_seen') || localStorage.getItem('surya_auth_token')) {
         const wp = document.getElementById('welcomePage');
         if (wp) { wp.style.display = 'none'; }
         document.getElementById('mainApp').style.display = '';
@@ -4942,7 +5037,7 @@ Rules:
     function dismissWelcome() {
       const wp = document.getElementById('welcomePage');
       wp.classList.add('exit');
-      sessionStorage.setItem('surya_welcome_seen', 'true');
+      localStorage.setItem('surya_welcome_seen', 'true');
       setTimeout(() => {
         wp.style.display = 'none';
         document.getElementById('mainApp').style.display = '';
@@ -4951,7 +5046,7 @@ Rules:
     }
 
     // Start (only if welcome page is skipped)
-    if (sessionStorage.getItem('surya_welcome_seen')) {
+    if (localStorage.getItem('surya_welcome_seen')) {
       // Already initialized in initWelcome
     }
   </script>
