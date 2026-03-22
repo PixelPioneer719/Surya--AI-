@@ -1380,6 +1380,52 @@
     .drop-overlay-inner span { font-size: 13px; color: var(--text-secondary); }
     .file-bar-close .material-symbols-outlined { font-size: 18px; }
 
+    /* Toast notification */
+    .toast-notification {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text-primary);
+      box-shadow: var(--shadow-xl);
+      z-index: 10000;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .toast-notification.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast-notification.warning { border-color: #f59e0b; }
+    .toast-notification.warning .toast-icon { color: #f59e0b; }
+    .toast-notification.error { border-color: var(--error); }
+    .toast-notification.error .toast-icon { color: var(--error); }
+    .toast-notification.success { border-color: var(--success); }
+    .toast-notification.success .toast-icon { color: var(--success); }
+    .toast-icon { font-size: 20px; }
+
+    /* AI Agent disabled on mobile/tablet */
+    @media (max-width: 1024px) {
+      .tool-item-agent { opacity: 0.5; position: relative; }
+      .tool-item-agent::after {
+        content: 'Desktop only';
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        color: var(--text-tertiary);
+        background: var(--bg-tertiary);
+        padding: 2px 8px;
+        border-radius: var(--radius-full);
+      }
+    }
+
     .textarea-wrapper { display: flex; align-items: flex-end; }
 
     #messageInput {
@@ -2314,7 +2360,7 @@
                       <span class="material-symbols-outlined">terminal</span>
                       <div>Code<div class="tool-item-desc">Expert coding assistant</div></div>
                     </button>
-                    <button class="tool-item" onclick="selectTool('AI Agent','smart_toy')">
+                    <button class="tool-item tool-item-agent" onclick="selectTool('AI Agent','smart_toy')">
                       <span class="material-symbols-outlined">smart_toy</span>
                       <div>AI Agent<div class="tool-item-desc">Autonomous task agent</div></div>
                     </button>
@@ -2902,47 +2948,95 @@
       }
     }
 
-    // --- Database: Chat History Sync ---
+    // --- Database: Chat History Sync (cross-device) ---
     async function saveChatsToDb() {
       const token = localStorage.getItem('surya_auth_token');
       if (!token || !currentUser) return;
+      let saved = false;
 
+      // Try InsForge database first
       try {
-        await fetch(`${INSFORGE_BASE}/api/database/chats`, {
+        const res = await fetch(`${INSFORGE_BASE}/api/database/chats`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token
+            'Authorization': 'Bearer ' + token,
+            'x-api-key': INSFORGE_API_KEY
           },
           body: JSON.stringify({
             user_id: currentUser.id,
             conversations: JSON.stringify(conversations),
             updated_at: new Date().toISOString()
-          })
+          }),
+          signal: AbortSignal.timeout(5000)
         });
-      } catch (e) {
-        console.warn('Failed to sync chats to DB:', e);
+        if (res.ok) saved = true;
+      } catch (e) {}
+
+      // Fallback: local server
+      if (!saved) {
+        try {
+          await fetch('/api/chats/save', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({ chats: conversations })
+          });
+        } catch (e) {
+          console.warn('Failed to sync chats to DB:', e);
+        }
       }
     }
 
     async function syncChatsFromDB() {
       const token = localStorage.getItem('surya_auth_token');
       if (!token || !currentUser) return;
+      let dbConvs = null;
 
+      // Try InsForge database first
       try {
         const res = await fetch(`${INSFORGE_BASE}/api/database/chats?user_id=eq.${currentUser.id}&select=*&limit=1`, {
-          headers: { 'Authorization': 'Bearer ' + token }
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'x-api-key': INSFORGE_API_KEY
+          },
+          signal: AbortSignal.timeout(5000)
         });
         const data = await res.json();
         if (data && data.length > 0 && data[0].conversations) {
-          const dbConvs = JSON.parse(data[0].conversations);
-          // Merge: DB conversations take priority for synced ones
-          conversations = { ...conversations, ...dbConvs };
-          saveConversationsToStorage();
-          renderChatHistory();
+          dbConvs = JSON.parse(data[0].conversations);
         }
-      } catch (e) {
-        console.warn('Failed to sync chats from DB:', e);
+      } catch (e) {}
+
+      // Fallback: local server
+      if (!dbConvs) {
+        try {
+          const res = await fetch('/api/chats/load', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          const data = await res.json();
+          if (data && data.chats && Object.keys(data.chats).length > 0) {
+            dbConvs = data.chats;
+          }
+        } catch (e) {
+          console.warn('Failed to sync chats from DB:', e);
+        }
+      }
+
+      // Smart merge — keep the newer version of each conversation
+      if (dbConvs) {
+        const localConvs = { ...conversations };
+        const merged = { ...localConvs };
+        for (const [id, conv] of Object.entries(dbConvs)) {
+          if (!merged[id] || (conv.updatedAt && (!merged[id].updatedAt || conv.updatedAt > merged[id].updatedAt))) {
+            merged[id] = conv;
+          }
+        }
+        conversations = merged;
+        saveConversationsToStorage();
+        renderChatHistory();
       }
     }
 
@@ -3341,6 +3435,31 @@ Rules:
     }
 
     // ═══════════════════════════════════════════════════
+    //  DEVICE DETECTION & NOTIFICATIONS
+    // ═══════════════════════════════════════════════════
+    function getDeviceType() {
+      const w = window.innerWidth;
+      if (w <= 768) return 'mobile';
+      if (w <= 1024) return 'tablet';
+      return 'desktop';
+    }
+
+    function showNotification(message, type = 'info') {
+      const existing = document.querySelector('.toast-notification');
+      if (existing) existing.remove();
+      const icons = { warning: 'warning', error: 'error', success: 'check_circle', info: 'info' };
+      const toast = document.createElement('div');
+      toast.className = `toast-notification ${type}`;
+      toast.innerHTML = `<span class="material-symbols-outlined toast-icon">${icons[type] || 'info'}</span><span>${message}</span>`;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add('show'));
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // ═══════════════════════════════════════════════════
     //  TOOLS POPUP
     // ═══════════════════════════════════════════════════
     function toggleToolsPopup(e) {
@@ -3358,6 +3477,10 @@ Rules:
     function selectTool(name, icon) {
       document.getElementById('toolsPopup').classList.remove('open');
       if (requireAuth(name)) return;
+      if (name === 'AI Agent' && getDeviceType() !== 'desktop') {
+        showNotification('AI Agent is only available on desktop. Please use a desktop browser.', 'warning');
+        return;
+      }
       activeTool = { name, icon };
 
       const chipsRow = document.getElementById('chipsRow');
