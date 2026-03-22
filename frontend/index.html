@@ -3320,6 +3320,8 @@
     let isLoading       = false;
     let abortController = null;
     let theme           = localStorage.getItem('surya_theme') || 'dark';
+    // Apply theme immediately to prevent flash of wrong theme
+    document.documentElement.setAttribute('data-theme', theme);
 
     // --- Per-user conversation storage (Privacy) ---
     function getConvStorageKey() {
