@@ -1,9 +1,11 @@
+require('dotenv').config();
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 const MIME_TYPES = {
   '.html': 'text/html',
@@ -25,15 +27,37 @@ const nodemailer = require('nodemailer');
 const { handleAgentRequest } = require('./agent.js');
 
 // ═══════════════════════════════════════════
+//  INSFORGE CONFIG (server-side proxy)
+// ═══════════════════════════════════════════
+const INSFORGE_BASE = process.env.INSFORGE_BASE;
+const INSFORGE_API_KEY = process.env.INSFORGE_API_KEY;
+
+// ═══════════════════════════════════════════
 //  GOOGLE OAUTH CONFIG
 // ═══════════════════════════════════════════
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_WORKSPACE_SCOPES = [
+  'openid',
+  'email',
+  'profile',
+  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/documents',
+  'https://www.googleapis.com/auth/presentations',
+  'https://www.googleapis.com/auth/spreadsheets'
+].join(' ');
+
+// ═══════════════════════════════════════════
+//  GITHUB OAUTH CONFIG
+// ═══════════════════════════════════════════
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 
 // ═══════════════════════════════════════════
 //  EMAIL VERIFICATION
 // ═══════════════════════════════════════════
 const pendingVerifications = {}; // { email: { code, name, salt, hash, expiresAt } }
+const workspaceOauthStates = new Map(); // state -> { email, createdAt }
 
 // Email transporter (using Gmail SMTP — set env vars SMTP_EMAIL and SMTP_PASS)
 // For Gmail: enable "App Passwords" at https://myaccount.google.com/apppasswords
@@ -86,6 +110,7 @@ async function sendVerificationEmail(email, code) {
 const DB_PATH = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DB_PATH, 'users.json');
 const CHATS_FILE = path.join(DB_PATH, 'chats.json');
+const CANVAS_PROMPT_FILE = path.join(__dirname, 'Surya_AI_Canvas.md');
 
 // Ensure data directory exists
 if (!fs.existsSync(DB_PATH)) fs.mkdirSync(DB_PATH, { recursive: true });
@@ -102,7 +127,11 @@ function readChats() {
   try { return JSON.parse(fs.readFileSync(CHATS_FILE, 'utf8')); } catch { return {}; }
 }
 function writeChats(chats) {
-  fs.writeFileSync(CHATS_FILE, JSON.stringify(chats, null, 2));
+  try {
+    fs.writeFileSync(CHATS_FILE, JSON.stringify(chats, null, 2));
+  } catch (e) {
+    console.error('Failed to write chats:', e.message);
+  }
 }
 
 function hashPassword(password) {
@@ -114,15 +143,70 @@ function verifyPassword(password, salt, hash) {
   const test = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
   return test === hash;
 }
+function normalizeChildName(name) {
+  return (name || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
+}
+function normalizeDob(dob) {
+  return (dob || '').toString().trim();
+}
 function generateToken() {
   return crypto.randomBytes(48).toString('hex');
 }
 
-// Parse JSON body from POST requests
-function parseBody(req) {
+function findUserByAuthToken(token) {
+  if (!token) return null;
+  const users = readUsers();
+  return users.find(u => u.token === token) || null;
+}
+
+function getTokenFromReq(req) {
+  return (req.headers.authorization || '').replace('Bearer ', '');
+}
+
+function resolveUserFromRequest(req, payload = {}) {
+  const token = getTokenFromReq(req);
+  let users = readUsers();
+  let user = users.find(u => u.token === token);
+  if (user) return user;
+
+  const emailFromClient = (
+    payload.email ||
+    payload.userEmail ||
+    req.headers['x-surya-user-email'] ||
+    ''
+  ).toString().trim().toLowerCase();
+  if (!emailFromClient) return null;
+
+  user = users.find(u => (u.email || '').toLowerCase() === emailFromClient);
+  if (!user) {
+    user = {
+      id: crypto.randomUUID(),
+      email: emailFromClient,
+      name: payload.name || emailFromClient.split('@')[0],
+      avatar: null,
+      provider: 'insforge',
+      verified: true,
+      token: token || null,
+      createdAt: new Date().toISOString()
+    };
+    users.push(user);
+  } else if (!user.token && token) {
+    user.token = token;
+  }
+  writeUsers(users);
+  return user;
+}
+
+// Parse JSON body from POST requests (10MB limit)
+function parseBody(req, maxSize = 10 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    let size = 0;
+    req.on('data', chunk => {
+      size += chunk.length;
+      if (size > maxSize) { req.destroy(); reject(new Error('Request body too large')); return; }
+      body += chunk;
+    });
     req.on('end', () => {
       try { resolve(JSON.parse(body)); } catch { reject(new Error('Invalid JSON')); }
     });
@@ -130,7 +214,146 @@ function parseBody(req) {
   });
 }
 
-const server = http.createServer((req, res) => {
+function makeJsonResponse(res, statusCode, body) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
+function httpsJsonRequest({ hostname, path, method = 'GET', headers = {}, body = null }) {
+  return new Promise((resolve, reject) => {
+    const req = https.request({ hostname, path, method, headers }, (resp) => {
+      let raw = '';
+      resp.on('data', c => raw += c);
+      resp.on('end', () => {
+        let json = null;
+        try { json = raw ? JSON.parse(raw) : {}; } catch { json = null; }
+        resolve({ statusCode: resp.statusCode || 0, data: json, raw });
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+async function refreshGoogleWorkspaceToken(userEmail) {
+  const users = readUsers();
+  const user = users.find(u => (u.email || '').toLowerCase() === (userEmail || '').toLowerCase());
+  if (!user || !user.googleWorkspace || !user.googleWorkspace.refreshToken) return null;
+
+  const postBody = querystring.stringify({
+    client_id: GOOGLE_CLIENT_ID,
+    client_secret: GOOGLE_CLIENT_SECRET,
+    grant_type: 'refresh_token',
+    refresh_token: user.googleWorkspace.refreshToken
+  });
+
+  const tokenRes = await httpsJsonRequest({
+    hostname: 'oauth2.googleapis.com',
+    path: '/token',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': Buffer.byteLength(postBody)
+    },
+    body: postBody
+  });
+
+  if (tokenRes.statusCode < 200 || tokenRes.statusCode >= 300 || !tokenRes.data || !tokenRes.data.access_token) {
+    return null;
+  }
+
+  user.googleWorkspace = {
+    ...user.googleWorkspace,
+    connected: true,
+    accessToken: tokenRes.data.access_token,
+    scope: tokenRes.data.scope || user.googleWorkspace.scope || GOOGLE_WORKSPACE_SCOPES,
+    expiryDate: tokenRes.data.expires_in ? Date.now() + (tokenRes.data.expires_in * 1000) : user.googleWorkspace.expiryDate
+  };
+  writeUsers(users);
+  return user.googleWorkspace.accessToken;
+}
+
+async function getValidGoogleWorkspaceToken(user) {
+  const workspace = user && user.googleWorkspace;
+  if (!workspace || !workspace.connected || !workspace.accessToken) return null;
+  const expiry = workspace.expiryDate || 0;
+  if (!expiry || expiry > (Date.now() + 60 * 1000)) {
+    return workspace.accessToken;
+  }
+  return await refreshGoogleWorkspaceToken(user.email);
+}
+
+function extractGoogleDocId(inputText, kind) {
+  if (!inputText) return null;
+  const patterns = {
+    docs: /docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/,
+    slides: /docs\.google\.com\/presentation\/d\/([a-zA-Z0-9_-]+)/
+  };
+  const direct = (patterns[kind] || patterns.docs).exec(inputText);
+  if (direct && direct[1]) return direct[1];
+  const generic = /(?:doc|document|slide|presentation)\s*(?:id)?\s*[:=]?\s*([a-zA-Z0-9_-]{20,})/i.exec(inputText);
+  return generic && generic[1] ? generic[1] : null;
+}
+
+function extractTextFromGoogleDoc(doc) {
+  const out = [];
+  const body = doc && doc.body && doc.body.content ? doc.body.content : [];
+  for (const block of body) {
+    if (!block.paragraph || !block.paragraph.elements) continue;
+    for (const el of block.paragraph.elements) {
+      const t = el.textRun && el.textRun.content ? el.textRun.content.trim() : '';
+      if (t) out.push(t);
+    }
+  }
+  return out.join('\n').slice(0, 12000);
+}
+
+function extractTextFromGoogleSlides(deck) {
+  const lines = [];
+  const slides = deck && deck.slides ? deck.slides : [];
+  for (const slide of slides) {
+    const elements = slide.pageElements || [];
+    for (const element of elements) {
+      const textElements = element.shape && element.shape.text && element.shape.text.textElements
+        ? element.shape.text.textElements
+        : [];
+      for (const te of textElements) {
+        const run = te.textRun && te.textRun.content ? te.textRun.content.trim() : '';
+        if (run) lines.push(run);
+      }
+    }
+  }
+  return lines.join('\n').slice(0, 12000);
+}
+
+function looksLikeGenericDrivePrompt(prompt) {
+  const t = (prompt || '').toLowerCase();
+  const generic = [
+    'my drive',
+    'google drive',
+    'drive files',
+    'list files',
+    'show files',
+    'workspace files',
+    'show my files'
+  ];
+  return generic.some(k => t.includes(k));
+}
+
+const server = http.createServer(async (req, res) => {
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+
+  const forwardedProto = (req.headers['x-forwarded-proto'] || '').toString().split(',')[0].trim();
+  const host = (req.headers.host || '').toString();
+  const isLocalHost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+  if (IS_PRODUCTION && !isLocalHost && forwardedProto && forwardedProto !== 'https') {
+    res.writeHead(301, { Location: `https://${host}${req.url}` });
+    res.end();
+    return;
+  }
+
   // CORS headers for all API routes
   if (req.url.startsWith('/api/')) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -141,6 +364,65 @@ const server = http.createServer((req, res) => {
       res.end();
       return;
     }
+  }
+
+  // ═══════════════════════════════════════════
+  //  INSFORGE SERVER-SIDE PROXY (streaming)
+  // ═══════════════════════════════════════════
+  if (req.url === '/api/ai/chat/completion' && req.method === 'POST') {
+    if (!INSFORGE_BASE || !INSFORGE_API_KEY) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing INSFORGE_BASE / INSFORGE_API_KEY in .env' }));
+      return;
+    }
+
+    try {
+      const payload = await parseBody(req);
+      const target = new URL('/api/ai/chat/completion', INSFORGE_BASE);
+
+      const upstream = https.request(
+        {
+          hostname: target.hostname,
+          path: target.pathname + target.search,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${INSFORGE_API_KEY}`
+          }
+        },
+        (up) => {
+          // Pass through status + content type; keep streaming behavior.
+          res.writeHead(up.statusCode || 200, {
+            'Content-Type': up.headers['content-type'] || 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-cache'
+          });
+          up.pipe(res);
+        }
+      );
+
+      upstream.on('error', (e) => {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Upstream request failed', detail: e.message }));
+      });
+
+      upstream.write(JSON.stringify(payload || {}));
+      upstream.end();
+      return;
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+      return;
+    }
+  }
+
+  if (req.url === '/api/canvas/prompt' && req.method === 'GET') {
+    try {
+      const prompt = fs.readFileSync(CANVAS_PROMPT_FILE, 'utf8');
+      makeJsonResponse(res, 200, { prompt });
+    } catch (e) {
+      makeJsonResponse(res, 500, { error: 'Failed to read canvas prompt', detail: e.message });
+    }
+    return;
   }
 
   // ═══════════════════════════════════════════
@@ -168,8 +450,10 @@ const server = http.createServer((req, res) => {
   if (req.url.startsWith('/auth/google/callback') && req.method === 'GET') {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     const code = parsedUrl.searchParams.get('code');
+    const state = parsedUrl.searchParams.get('state');
+    const workspaceState = state ? workspaceOauthStates.get(state) : null;
     if (!code) {
-      res.writeHead(302, { Location: '/?auth_error=no_code' });
+      res.writeHead(302, { Location: workspaceState ? '/?workspace_error=no_code' : '/?auth_error=no_code' });
       res.end();
       return;
     }
@@ -201,7 +485,30 @@ const server = http.createServer((req, res) => {
         try {
           const tokens = JSON.parse(body);
           if (!tokens.access_token) {
-            res.writeHead(302, { Location: '/?auth_error=token_failed' });
+            res.writeHead(302, { Location: workspaceState ? '/?workspace_error=token_failed' : '/?auth_error=token_failed' });
+            res.end();
+            return;
+          }
+
+          if (workspaceState && workspaceState.email) {
+            workspaceOauthStates.delete(state);
+            const users = readUsers();
+            const user = users.find(u => (u.email || '').toLowerCase() === workspaceState.email.toLowerCase());
+            if (!user) {
+              res.writeHead(302, { Location: '/?workspace_error=user_not_found' });
+              res.end();
+              return;
+            }
+            user.googleWorkspace = {
+              connected: true,
+              connectedAt: new Date().toISOString(),
+              scope: tokens.scope || GOOGLE_WORKSPACE_SCOPES,
+              accessToken: tokens.access_token,
+              refreshToken: tokens.refresh_token || (user.googleWorkspace && user.googleWorkspace.refreshToken) || null,
+              expiryDate: tokens.expires_in ? Date.now() + (tokens.expires_in * 1000) : null
+            };
+            writeUsers(users);
+            res.writeHead(302, { Location: '/?workspace_connected=1' });
             res.end();
             return;
           }
@@ -261,16 +568,88 @@ const server = http.createServer((req, res) => {
           });
           userReq.end();
         } catch (e) {
-          res.writeHead(302, { Location: '/?auth_error=token_parse_failed' });
+          res.writeHead(302, { Location: workspaceState ? '/?workspace_error=token_parse_failed' : '/?auth_error=token_parse_failed' });
           res.end();
         }
       });
     });
     tokenReq.on('error', () => {
-      res.writeHead(302, { Location: '/?auth_error=token_request_failed' });
+      res.writeHead(302, { Location: workspaceState ? '/?workspace_error=token_request_failed' : '/?auth_error=token_request_failed' });
       res.end();
     });
     tokenReq.write(tokenData);
+    tokenReq.end();
+    return;
+  }
+
+  // ═══════════════════════════════════════════
+  //  GITHUB OAUTH
+  // ═══════════════════════════════════════════
+
+  // Step 1: Redirect to GitHub
+  if (req.url === '/auth/github' && req.method === 'GET') {
+    const proto = req.headers['x-forwarded-proto'] || 'http';
+    const redirectUri = `${proto}://${req.headers.host}/auth/github/callback`;
+    const params = new URLSearchParams({
+      client_id: GITHUB_CLIENT_ID,
+      redirect_uri: redirectUri,
+      scope: 'repo user:email',
+      state: crypto.randomBytes(16).toString('hex')
+    });
+    res.writeHead(302, { Location: `https://github.com/login/oauth/authorize?${params}` });
+    res.end();
+    return;
+  }
+
+  // Step 2: GitHub callback — exchange code for access token
+  if (req.url.startsWith('/auth/github/callback') && req.method === 'GET') {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const code = parsedUrl.searchParams.get('code');
+    if (!code) {
+      res.writeHead(302, { Location: '/?github_auth_error=no_code' });
+      res.end();
+      return;
+    }
+
+    const proto = req.headers['x-forwarded-proto'] || 'http';
+    const redirectUri = `${proto}://${req.headers.host}/auth/github/callback`;
+    const tokenBody = JSON.stringify({
+      client_id: GITHUB_CLIENT_ID,
+      client_secret: GITHUB_CLIENT_SECRET,
+      code,
+      redirect_uri: redirectUri
+    });
+
+    const tokenReq = https.request({
+      hostname: 'github.com',
+      path: '/login/oauth/access_token',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Content-Length': Buffer.byteLength(tokenBody)
+      }
+    }, tokenRes => {
+      let data = '';
+      tokenRes.on('data', c => data += c);
+      tokenRes.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          const accessToken = json.access_token;
+          if (!accessToken) throw new Error('no access_token');
+          res.writeHead(302, { Location: `/?github_auth=${encodeURIComponent(accessToken)}` });
+          res.end();
+        } catch {
+          res.writeHead(302, { Location: '/?github_auth_error=token_parse_failed' });
+          res.end();
+        }
+      });
+    });
+    tokenReq.on('error', () => {
+      res.writeHead(302, { Location: '/?github_auth_error=token_request_failed' });
+      res.end();
+    });
+    tokenReq.write(tokenBody);
     tokenReq.end();
     return;
   }
@@ -436,6 +815,113 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Child Sign Up (no email)
+  if (req.url === '/api/auth/child/sign-up' && req.method === 'POST') {
+    parseBody(req).then(({ name, dateOfBirth, password }) => {
+      const normalizedName = normalizeChildName(name);
+      const dob = normalizeDob(dateOfBirth);
+      if (!normalizedName || !dob || !password) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Name, dateOfBirth and password are required' }));
+        return;
+      }
+      const users = readUsers();
+      const alreadyExists = users.find(u =>
+        u.accountType === 'child' &&
+        normalizeChildName(u.childName) === normalizedName &&
+        normalizeDob(u.childDob) === dob
+      );
+      if (alreadyExists) {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Child account already exists. Please sign in.' }));
+        return;
+      }
+      const { salt, hash } = hashPassword(password);
+      const token = generateToken();
+      const safeName = name.toString().trim().replace(/\s+/g, ' ');
+      const user = {
+        id: crypto.randomUUID(),
+        accountType: 'child',
+        childName: safeName,
+        childDob: dob,
+        name: safeName,
+        email: null,
+        avatar: null,
+        provider: 'child-local',
+        salt,
+        hash,
+        token,
+        verified: true,
+        createdAt: new Date().toISOString()
+      };
+      users.push(user);
+      writeUsers(users);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        data: {
+          accessToken: token,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            avatar: user.avatar,
+            accountType: user.accountType,
+            childDob: user.childDob
+          }
+        }
+      }));
+    }).catch(e => {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    });
+    return;
+  }
+
+  // Child Sign In (name + dateOfBirth + password)
+  if (req.url === '/api/auth/child/sign-in' && req.method === 'POST') {
+    parseBody(req).then(({ name, dateOfBirth, password }) => {
+      const normalizedName = normalizeChildName(name);
+      const dob = normalizeDob(dateOfBirth);
+      if (!normalizedName || !dob || !password) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Name, dateOfBirth and password are required' }));
+        return;
+      }
+      const users = readUsers();
+      const candidates = users.filter(u =>
+        u.accountType === 'child' &&
+        normalizeChildName(u.childName) === normalizedName &&
+        normalizeDob(u.childDob) === dob
+      );
+      const user = candidates.find(u => verifyPassword(password, u.salt, u.hash));
+      if (!user) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid child credentials' }));
+        return;
+      }
+      user.token = generateToken();
+      writeUsers(users);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        data: {
+          accessToken: user.token,
+          user: {
+            id: user.id,
+            name: user.name || user.childName,
+            email: user.email || null,
+            avatar: user.avatar || null,
+            accountType: user.accountType || 'child',
+            childDob: user.childDob || null
+          }
+        }
+      }));
+    }).catch(e => {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    });
+    return;
+  }
+
   // Delete Account — permanently removes user and all their data
   if (req.url === '/api/auth/delete-account' && req.method === 'DELETE') {
     const token = (req.headers.authorization || '').replace('Bearer ', '');
@@ -494,9 +980,510 @@ const server = http.createServer((req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      data: { id: user.id, email: user.email, name: user.name, avatar: user.avatar }
+      data: {
+        id: user.id,
+        email: user.email || null,
+        name: user.name || user.childName || 'User',
+        avatar: user.avatar || null,
+        accountType: user.accountType || 'adult',
+        childDob: user.childDob || null
+      }
     }));
     return;
+  }
+
+  if (req.url === '/api/connectors/google-workspace/start' && req.method === 'POST') {
+    parseBody(req).then((payload) => {
+      const user = resolveUserFromRequest(req, payload || {});
+      if (!user) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not authenticated' }));
+        return;
+      }
+
+      const proto = req.headers['x-forwarded-proto'] || 'http';
+      const redirectUri = `${proto}://${req.headers.host}/auth/google/callback`;
+      const state = crypto.randomBytes(24).toString('hex');
+      workspaceOauthStates.set(state, { email: user.email, createdAt: Date.now() });
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: GOOGLE_WORKSPACE_SCOPES,
+        access_type: 'offline',
+        prompt: 'consent',
+        state
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+      }));
+    }).catch(e => {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    });
+    return;
+  }
+
+  if (req.url === '/api/connectors/google-workspace/status' && req.method === 'GET') {
+    const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not authenticated' }));
+      return;
+    }
+    const connector = user.googleWorkspace || null;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      connected: Boolean(connector && connector.connected),
+      connectedAt: connector && connector.connectedAt ? connector.connectedAt : null,
+      scopes: connector && connector.scope ? connector.scope : ''
+    }));
+    return;
+  }
+
+  if (req.url === '/api/connectors/google-workspace/disconnect' && req.method === 'POST') {
+    const token = getTokenFromReq(req);
+    const users = readUsers();
+    const user = users.find(u =>
+      (token && u.token === token) ||
+      ((u.email || '').toLowerCase() === ((req.headers['x-surya-user-email'] || '').toString().toLowerCase()))
+    );
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not authenticated' }));
+      return;
+    }
+    user.googleWorkspace = {
+      connected: false,
+      connectedAt: null,
+      scope: '',
+      accessToken: null,
+      refreshToken: null,
+      expiryDate: null
+    };
+    writeUsers(users);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  if (req.url.startsWith('/api/google-workspace/drive/files') && req.method === 'GET') {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
+    if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+    const token = await getValidGoogleWorkspaceToken(user);
+    if (!token) return makeJsonResponse(res, 401, { error: 'Google Workspace not connected' });
+
+    const query = parsedUrl.searchParams.get('query') || '';
+    const pageSize = Math.min(parseInt(parsedUrl.searchParams.get('pageSize') || '10', 10) || 10, 50);
+    const q = query
+      ? `name contains '${query.replace(/'/g, "\\'")}' and trashed=false`
+      : 'trashed=false';
+    const apiPath = `/drive/v3/files?pageSize=${pageSize}&orderBy=modifiedTime%20desc&q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,webViewLink,owners(displayName))`;
+    const driveRes = await httpsJsonRequest({
+      hostname: 'www.googleapis.com',
+      path: apiPath,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (driveRes.statusCode < 200 || driveRes.statusCode >= 300) {
+      return makeJsonResponse(res, 502, { error: 'Failed to fetch Drive files', detail: driveRes.data || driveRes.raw });
+    }
+    return makeJsonResponse(res, 200, { files: driveRes.data.files || [] });
+  }
+
+  if (req.url.startsWith('/api/google-workspace/docs/') && req.method === 'GET') {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const docId = decodeURIComponent(parsedUrl.pathname.split('/').pop() || '');
+    const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
+    if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+    const token = await getValidGoogleWorkspaceToken(user);
+    if (!token) return makeJsonResponse(res, 401, { error: 'Google Workspace not connected' });
+    if (!docId) return makeJsonResponse(res, 400, { error: 'Missing doc id' });
+
+    const docRes = await httpsJsonRequest({
+      hostname: 'docs.googleapis.com',
+      path: `/v1/documents/${encodeURIComponent(docId)}`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (docRes.statusCode < 200 || docRes.statusCode >= 300) {
+      return makeJsonResponse(res, 502, { error: 'Failed to fetch document', detail: docRes.data || docRes.raw });
+    }
+    return makeJsonResponse(res, 200, {
+      id: docRes.data.documentId,
+      title: docRes.data.title || 'Untitled document',
+      content: extractTextFromGoogleDoc(docRes.data)
+    });
+  }
+
+  if (req.url.startsWith('/api/google-workspace/slides/') && req.method === 'GET') {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const presentationId = decodeURIComponent(parsedUrl.pathname.split('/').pop() || '');
+    const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
+    if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+    const token = await getValidGoogleWorkspaceToken(user);
+    if (!token) return makeJsonResponse(res, 401, { error: 'Google Workspace not connected' });
+    if (!presentationId) return makeJsonResponse(res, 400, { error: 'Missing presentation id' });
+
+    const slideRes = await httpsJsonRequest({
+      hostname: 'slides.googleapis.com',
+      path: `/v1/presentations/${encodeURIComponent(presentationId)}`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (slideRes.statusCode < 200 || slideRes.statusCode >= 300) {
+      return makeJsonResponse(res, 502, { error: 'Failed to fetch presentation', detail: slideRes.data || slideRes.raw });
+    }
+    return makeJsonResponse(res, 200, {
+      id: slideRes.data.presentationId,
+      title: slideRes.data.title || 'Untitled presentation',
+      content: extractTextFromGoogleSlides(slideRes.data)
+    });
+  }
+
+  if (req.url === '/api/google-workspace/docs/create' && req.method === 'POST') {
+    parseBody(req).then(async ({ title, content }) => {
+      const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
+      if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+      const token = await getValidGoogleWorkspaceToken(user);
+      if (!token) return makeJsonResponse(res, 401, { error: 'Google Workspace not connected' });
+
+      const safeTitle = (title || 'Surya AI Document').toString().slice(0, 120);
+      const safeContent = (content || '').toString().slice(0, 40000);
+      const createRes = await httpsJsonRequest({
+        hostname: 'docs.googleapis.com',
+        path: '/v1/documents',
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ title: safeTitle })
+      });
+      if (createRes.statusCode < 200 || createRes.statusCode >= 300 || !createRes.data || !createRes.data.documentId) {
+        return makeJsonResponse(res, 502, { error: 'Failed to create Google Doc', detail: createRes.data || createRes.raw });
+      }
+
+      const docId = createRes.data.documentId;
+      if (safeContent.trim()) {
+        await httpsJsonRequest({
+          hostname: 'docs.googleapis.com',
+          path: `/v1/documents/${encodeURIComponent(docId)}:batchUpdate`,
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            requests: [
+              {
+                insertText: {
+                  location: { index: 1 },
+                  text: safeContent
+                }
+              }
+            ]
+          })
+        });
+      }
+      return makeJsonResponse(res, 200, {
+        id: docId,
+        title: safeTitle,
+        url: `https://docs.google.com/document/d/${docId}/edit`
+      });
+    }).catch(e => makeJsonResponse(res, 400, { error: e.message }));
+    return;
+  }
+
+  // Create Google Slides presentation
+  if (req.url === '/api/google-workspace/slides/create' && req.method === 'POST') {
+    parseBody(req).then(async ({ title, slides }) => {
+      const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
+      if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+      const token = await getValidGoogleWorkspaceToken(user);
+      if (!token) return makeJsonResponse(res, 401, { error: 'Google Workspace not connected' });
+
+      const safeTitle = (title || 'Surya AI Presentation').toString().slice(0, 120);
+      const slideList = Array.isArray(slides) ? slides.slice(0, 20) : [];
+
+      // Create empty presentation
+      const createRes = await httpsJsonRequest({
+        hostname: 'slides.googleapis.com',
+        path: '/v1/presentations',
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: safeTitle })
+      });
+      if (createRes.statusCode < 200 || createRes.statusCode >= 300 || !createRes.data || !createRes.data.presentationId) {
+        return makeJsonResponse(res, 502, { error: 'Failed to create presentation', detail: createRes.data || createRes.raw });
+      }
+
+      const presId = createRes.data.presentationId;
+      const defaultSlideId = createRes.data.slides?.[0]?.objectId;
+
+      // Build batch update requests
+      const requests = [];
+
+      // Style the default title slide — set dark background
+      if (defaultSlideId) {
+        requests.push({
+          updatePageProperties: {
+            objectId: defaultSlideId,
+            pageProperties: {
+              pageBackgroundFill: {
+                solidFill: { color: { rgbColor: { red: 0.08, green: 0.08, blue: 0.12 } } }
+              }
+            },
+            fields: 'pageBackgroundFill'
+          }
+        });
+
+        // Find title placeholder on default slide and insert presentation title
+        const defaultSlide = createRes.data.slides[0];
+        if (defaultSlide?.pageElements) {
+          for (const el of defaultSlide.pageElements) {
+            const phType = el.shape?.placeholder?.type;
+            if (phType === 'CENTER_TITLE' || phType === 'TITLE') {
+              requests.push({ insertText: { objectId: el.objectId, text: safeTitle } });
+              requests.push({
+                updateTextStyle: {
+                  objectId: el.objectId,
+                  style: {
+                    foregroundColor: { opaqueColor: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+                    fontSize: { magnitude: 36, unit: 'PT' },
+                    bold: true,
+                    fontFamily: 'Google Sans'
+                  },
+                  textRange: { type: 'ALL' },
+                  fields: 'foregroundColor,fontSize,bold,fontFamily'
+                }
+              });
+            }
+            if (phType === 'SUBTITLE') {
+              requests.push({ insertText: { objectId: el.objectId, text: 'Generated by Surya AI' } });
+              requests.push({
+                updateTextStyle: {
+                  objectId: el.objectId,
+                  style: {
+                    foregroundColor: { opaqueColor: { rgbColor: { red: 0.6, green: 0.6, blue: 0.7 } } },
+                    fontSize: { magnitude: 16, unit: 'PT' },
+                    fontFamily: 'Google Sans'
+                  },
+                  textRange: { type: 'ALL' },
+                  fields: 'foregroundColor,fontSize,fontFamily'
+                }
+              });
+            }
+          }
+        }
+      }
+
+      // Add content slides
+      for (let i = 0; i < slideList.length; i++) {
+        const slide = slideList[i];
+        const slideId = 'slide_' + i;
+        const titleId = 'title_' + i;
+        const bodyId = 'body_' + i;
+
+        // Create slide
+        requests.push({
+          createSlide: {
+            objectId: slideId,
+            insertionIndex: i + 1,
+            slideLayoutReference: { predefinedLayout: 'TITLE_AND_BODY' },
+            placeholderIdMappings: [
+              { layoutPlaceholder: { type: 'TITLE' }, objectId: titleId },
+              { layoutPlaceholder: { type: 'BODY', index: 0 }, objectId: bodyId }
+            ]
+          }
+        });
+
+        // Dark background for each slide
+        requests.push({
+          updatePageProperties: {
+            objectId: slideId,
+            pageProperties: {
+              pageBackgroundFill: {
+                solidFill: { color: { rgbColor: { red: 0.08, green: 0.08, blue: 0.12 } } }
+              }
+            },
+            fields: 'pageBackgroundFill'
+          }
+        });
+
+        // Insert and style title
+        if (slide.title) {
+          const titleText = slide.title.toString().slice(0, 200);
+          requests.push({ insertText: { objectId: titleId, text: titleText } });
+          requests.push({
+            updateTextStyle: {
+              objectId: titleId,
+              style: {
+                foregroundColor: { opaqueColor: { rgbColor: { red: 1, green: 1, blue: 1 } } },
+                fontSize: { magnitude: 28, unit: 'PT' },
+                bold: true,
+                fontFamily: 'Google Sans'
+              },
+              textRange: { type: 'ALL' },
+              fields: 'foregroundColor,fontSize,bold,fontFamily'
+            }
+          });
+        }
+
+        // Insert and style body
+        if (slide.body) {
+          const bodyText = slide.body.toString().slice(0, 3000);
+          requests.push({ insertText: { objectId: bodyId, text: bodyText } });
+          requests.push({
+            updateTextStyle: {
+              objectId: bodyId,
+              style: {
+                foregroundColor: { opaqueColor: { rgbColor: { red: 0.85, green: 0.85, blue: 0.9 } } },
+                fontSize: { magnitude: 16, unit: 'PT' },
+                fontFamily: 'Google Sans'
+              },
+              textRange: { type: 'ALL' },
+              fields: 'foregroundColor,fontSize,fontFamily'
+            }
+          });
+        }
+      }
+
+      // Send all requests in one batch
+      if (requests.length > 0) {
+        await httpsJsonRequest({
+          hostname: 'slides.googleapis.com',
+          path: `/v1/presentations/${encodeURIComponent(presId)}:batchUpdate`,
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests })
+        });
+      }
+
+      return makeJsonResponse(res, 200, {
+        id: presId,
+        title: safeTitle,
+        url: `https://docs.google.com/presentation/d/${presId}/edit`
+      });
+    }).catch(e => makeJsonResponse(res, 400, { error: e.message }));
+    return;
+  }
+
+  // Create Google Sheets spreadsheet
+  if (req.url === '/api/google-workspace/sheets/create' && req.method === 'POST') {
+    parseBody(req).then(async ({ title, data }) => {
+      const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
+      if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+      const token = await getValidGoogleWorkspaceToken(user);
+      if (!token) return makeJsonResponse(res, 401, { error: 'Google Workspace not connected' });
+
+      const safeTitle = (title || 'Surya AI Spreadsheet').toString().slice(0, 120);
+      const rows = Array.isArray(data) ? data.slice(0, 500) : [];
+
+      // Create spreadsheet
+      const createRes = await httpsJsonRequest({
+        hostname: 'sheets.googleapis.com',
+        path: '/v4/spreadsheets',
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          properties: { title: safeTitle },
+          sheets: [{ properties: { title: 'Sheet1' } }]
+        })
+      });
+      if (createRes.statusCode < 200 || createRes.statusCode >= 300 || !createRes.data || !createRes.data.spreadsheetId) {
+        return makeJsonResponse(res, 502, { error: 'Failed to create spreadsheet', detail: createRes.data || createRes.raw });
+      }
+
+      const sheetId = createRes.data.spreadsheetId;
+
+      // Populate data if provided
+      if (rows.length > 0) {
+        const values = rows.map(row => Array.isArray(row) ? row.map(cell => String(cell).slice(0, 1000)) : [String(row)]);
+        await httpsJsonRequest({
+          hostname: 'sheets.googleapis.com',
+          path: `/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED`,
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values })
+        });
+      }
+
+      return makeJsonResponse(res, 200, {
+        id: sheetId,
+        title: safeTitle,
+        url: `https://docs.google.com/spreadsheets/d/${sheetId}/edit`
+      });
+    }).catch(e => makeJsonResponse(res, 400, { error: e.message }));
+    return;
+  }
+
+  if (req.url.startsWith('/api/google-workspace/query?') && req.method === 'GET') {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const prompt = (parsedUrl.searchParams.get('prompt') || '').trim();
+    const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
+    if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+    const token = await getValidGoogleWorkspaceToken(user);
+    if (!token) return makeJsonResponse(res, 401, { error: 'Google Workspace not connected' });
+
+    const lower = prompt.toLowerCase();
+    const docId = extractGoogleDocId(prompt, 'docs');
+    const slideId = extractGoogleDocId(prompt, 'slides');
+    if ((lower.includes('doc') || lower.includes('document')) && docId) {
+      const docRes = await httpsJsonRequest({
+        hostname: 'docs.googleapis.com',
+        path: `/v1/documents/${encodeURIComponent(docId)}`,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (docRes.statusCode < 200 || docRes.statusCode >= 300) {
+        return makeJsonResponse(res, 502, { error: 'Failed to fetch document', detail: docRes.data || docRes.raw });
+      }
+      return makeJsonResponse(res, 200, {
+        type: 'document',
+        title: docRes.data.title || 'Untitled document',
+        content: extractTextFromGoogleDoc(docRes.data)
+      });
+    }
+
+    if ((lower.includes('slide') || lower.includes('presentation')) && slideId) {
+      const slideRes = await httpsJsonRequest({
+        hostname: 'slides.googleapis.com',
+        path: `/v1/presentations/${encodeURIComponent(slideId)}`,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (slideRes.statusCode < 200 || slideRes.statusCode >= 300) {
+        return makeJsonResponse(res, 502, { error: 'Failed to fetch presentation', detail: slideRes.data || slideRes.raw });
+      }
+      return makeJsonResponse(res, 200, {
+        type: 'presentation',
+        title: slideRes.data.title || 'Untitled presentation',
+        content: extractTextFromGoogleSlides(slideRes.data)
+      });
+    }
+
+    const useGenericList = !prompt || looksLikeGenericDrivePrompt(prompt);
+    const q = useGenericList
+      ? 'trashed=false'
+      : `name contains '${prompt.replace(/'/g, "\\'")}' and trashed=false`;
+    const driveRes = await httpsJsonRequest({
+      hostname: 'www.googleapis.com',
+      path: `/drive/v3/files?pageSize=10&orderBy=modifiedTime%20desc&q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime,webViewLink,owners(displayName))`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (driveRes.statusCode < 200 || driveRes.statusCode >= 300) {
+      return makeJsonResponse(res, 502, { error: 'Failed to fetch Drive files', detail: driveRes.data || driveRes.raw });
+    }
+    return makeJsonResponse(res, 200, {
+      type: 'drive_files',
+      files: driveRes.data.files || []
+    });
   }
 
 
@@ -657,9 +1644,22 @@ const server = http.createServer((req, res) => {
 
   // DuckDuckGo search removed — using Grok's built-in web search instead
 
+  // If a request reaches here and it's still an API route,
+  // return JSON 404 instead of SPA fallback HTML.
+  if (req.url.startsWith('/api/')) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'API route not found', path: req.url }));
+    return;
+  }
+
+  const frontendDist = path.join(__dirname, 'frontend', 'dist');
+  const frontendDir = fs.existsSync(path.join(frontendDist, 'index.html'))
+    ? frontendDist
+    : path.join(__dirname, 'frontend');
+
   const parsedPath = url.parse(req.url).pathname;
   let filePath = parsedPath === '/' ? '/index.html' : parsedPath;
-  filePath = path.join(__dirname, 'frontend', filePath);
+  filePath = path.join(frontendDir, filePath);
 
   const ext = path.extname(filePath);
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
@@ -668,7 +1668,7 @@ const server = http.createServer((req, res) => {
     if (err) {
       if (err.code === 'ENOENT') {
         // SPA fallback
-        fs.readFile(path.join(__dirname, 'frontend', 'index.html'), (err2, fallback) => {
+        fs.readFile(path.join(frontendDir, 'index.html'), (err2, fallback) => {
           if (err2) {
             res.writeHead(500);
             res.end('Server Error');
@@ -690,4 +1690,11 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Surya AI running at http://localhost:${PORT}`);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
 });
