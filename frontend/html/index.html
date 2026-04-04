@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="4I_vE8K1Oh2sjiw7dUqPGeeHyoSKaVfWEVFvjQPjoyo" />
+  <title>Surya AI — Free AI Chatbot for Coding, Research & Image Generation</title>
+  <meta name="description" content="Surya AI is a powerful free AI assistant for coding, research, web search, image generation, and learning. Built by PVS Hariharan. Try it now — no sign-up required.">
+  <meta name="keywords" content="Surya AI, AI chatbot, free AI assistant, AI coding helper, AI image generator, AI web search, AI agent, chatbot, artificial intelligence, PVS Hariharan, code assistant, research assistant, AI tools">
+  <meta name="author" content="PVS Hariharan">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="theme-color" content="#e8550f">
+  <meta name="color-scheme" content="dark light">
+  <link rel="canonical" href="https://suryaai.in">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://suryaai.in">
+  <meta property="og:title" content="Surya AI — Free AI Chatbot for Coding, Research & Image Generation">
+  <meta property="og:description" content="Powerful free AI assistant for coding, research, web search, image generation and more. Built by PVS Hariharan.">
+  <meta property="og:image" content="https://suryaai.in/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="Surya AI">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Surya AI — Free AI Chatbot for Coding, Research & Image Generation">
+  <meta name="twitter:description" content="Powerful free AI assistant for coding, research, web search, image generation and more. Built by PVS Hariharan.">
+  <meta name="twitter:image" content="https://suryaai.in/og-image.png">
+
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Surya AI",
+    "url": "https://suryaai.in",
+    "description": "Free AI chatbot for coding, research, web search, image generation, and learning. Powered by multiple AI models.",
+    "applicationCategory": "Artificial Intelligence",
+    "operatingSystem": "Web Browser",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "PVS Hariharan",
+      "url": "https://suryaai.in"
+    },
+    "featureList": [
+      "AI Chat with multiple models",
+      "Code generation and debugging",
+      "AI image generation",
+      "Real-time web search",
+      "AI Agent for browser automation",
+      "Prompt upgrade engine"
+    ]
+  }
+  </script>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Surya AI">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljs-theme">
+
+  <!-- External CSS Files -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+
+<body>
+  <!-- ═══ 3D WELCOME PAGE ═══ -->
+  <div class="welcome-page" id="welcomePage">
+    <canvas id="welcomeCanvas"></canvas>
+    <div class="welcome-content">
+      <div class="welcome-hero">
+        <div class="welcome-logo-3d">
+          <div class="welcome-orb">
+            <div class="orb-ring ring-1"></div>
+            <div class="orb-ring ring-2"></div>
+            <div class="orb-ring ring-3"></div>
+            <div class="orb-core">
+              <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="32" cy="32" r="14" fill="#fff"/>
+                <g stroke="#fff" stroke-width="3.5" stroke-linecap="round">
+                  <line x1="32" y1="4" x2="32" y2="13"/>
+                  <line x1="32" y1="51" x2="32" y2="60"/>
+                  <line x1="4" y1="32" x2="13" y2="32"/>
+                  <line x1="51" y1="32" x2="60" y2="32"/>
+                  <line x1="12.2" y1="12.2" x2="18.6" y2="18.6"/>
+                  <line x1="45.4" y1="45.4" x2="51.8" y2="51.8"/>
+                  <line x1="12.2" y1="51.8" x2="18.6" y2="45.4"/>
+                  <line x1="45.4" y1="18.6" x2="51.8" y2="12.2"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <h1 class="welcome-title">
+          <span class="welcome-word" style="--i:0">Meet</span>
+          <span class="welcome-word welcome-gradient" style="--i:1">Surya AI</span>
+        </h1>
+        <p class="welcome-subtitle">Your intelligent companion for coding, research, and creativity.</p>
+        <div class="welcome-features">
+          <div class="welcome-feature" style="--delay:0.6s">
+            <div class="feature-icon"><span class="material-symbols-outlined">code</span></div>
+            <span>Write Code</span>
+          </div>
+          <div class="welcome-feature" style="--delay:0.8s">
+            <div class="feature-icon"><span class="material-symbols-outlined">image</span></div>
+            <span>Generate Images</span>
+          </div>
+          <div class="welcome-feature" style="--delay:1.0s">
+            <div class="feature-icon"><span class="material-symbols-outlined">travel_explore</span></div>
+            <span>Web Search</span>
+          </div>
+          <div class="welcome-feature" style="--delay:1.2s">
+            <div class="feature-icon"><span class="material-symbols-outlined">smart_toy</span></div>
+            <span>AI Agent</span>
+          </div>
+        </div>
+        <button class="welcome-cta" id="welcomeCta" onclick="dismissWelcome()">
+          <span>Get Started</span>
+          <span class="material-symbols-outlined">arrow_forward</span>
+        </button>
+        <p class="welcome-credit">Built by PVS Hariharan</p>
+      </div>
+    </div>
+    <div class="welcome-scroll-hint">
+      <div class="scroll-mouse">
+        <div class="scroll-dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app" id="mainApp" style="display:none;">
+    <!-- ═══ SIDEBAR ═══ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="sidebar-brand-icon">
+            <span class="surya-logo"><svg width="16" height="16" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="32" r="14" fill="#fff"/><g stroke="#fff" stroke-width="3.5" stroke-linecap="round"><line x1="32" y1="4" x2="32" y2="13"/><line x1="32" y1="51" x2="32" y2="60"/><line x1="4" y1="32" x2="13" y2="32"/><line x1="51" y1="32" x2="60" y2="32"/><line x1="12.2" y1="12.2" x2="18.6" y2="18.6"/><line x1="45.4" y1="45.4" x2="51.8" y2="51.8"/><line x1="12.2" y1="51.8" x2="18.6" y2="45.4"/><line x1="45.4" y1="18.6" x2="51.8" y2="12.2"/></g></svg></span>
+          </div>
+          Surya AI
+        </div>
+        <button class="icon-btn" onclick="toggleSidebar()" title="Close sidebar">
+          <span class="material-symbols-outlined">menu_open</span>
+        </button>
+      </div>
+
+      <button class="new-chat-btn" onclick="newChat()">
+        <span class="material-symbols-outlined">add</span>
+        New Chat
+      </button>
+
+      <button class="build-app-btn" onclick="startCanvasProject()">
+        <span class="material-symbols-outlined">dashboard_customize</span>
+        Build Your App
+      </button>
+
+      <div class="sidebar-section">Recent</div>
+      <div class="chat-history" id="chatHistory"></div>
+
+      <div class="sidebar-section apps-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Apps</span>
+          <button class="icon-btn" onclick="toggleAppsSection()" title="Toggle Apps" style="padding:4px;">
+            <span class="material-symbols-outlined" id="appsToggleIcon">expand_more</span>
+          </button>
+        </div>
+      </div>
+      <div class="apps-gallery" id="appsGallery">
+        <button class="app-template-btn" onclick="createAppFromTemplate('todo')">
+          <div class="app-template-icon">✅</div>
+          <div class="app-template-info">
+            <div class="app-template-name">Todo App</div>
+            <div class="app-template-desc">Task management with local storage</div>
+          </div>
+        </button>
+        <button class="app-template-btn" onclick="createAppFromTemplate('weather')">
+          <div class="app-template-icon">🌤️</div>
+          <div class="app-template-info">
+            <div class="app-template-name">Weather App</div>
+            <div class="app-template-desc">Current weather with location</div>
+          </div>
+        </button>
+        <button class="app-template-btn" onclick="createAppFromTemplate('calculator')">
+          <div class="app-template-icon">🧮</div>
+          <div class="app-template-info">
+            <div class="app-template-name">Calculator</div>
+            <div class="app-template-desc">Basic calculator with history</div>
+          </div>
+        </button>
+        <button class="app-template-btn" onclick="createAppFromTemplate('notes')">
+          <div class="app-template-icon">📝</div>
+          <div class="app-template-info">
+            <div class="app-template-name">Notes App</div>
+            <div class="app-template-desc">Simple note-taking with search</div>
+          </div>
+        </button>
+        <button class="app-template-btn" onclick="createAppFromTemplate('timer')">
+          <div class="app-template-icon">⏱️</div>
+          <div class="app-template-info">
+            <div class="app-template-name">Timer App</div>
+            <div class="app-template-desc">Countdown timer with alarms</div>
+          </div>
+        </button>
+        <button class="app-template-btn" onclick="createAppFromTemplate('blog')">
+          <div class="app-template-icon">📖</div>
+          <div class="app-template-info">
+            <div class="app-template-name">Blog Template</div>
+            <div class="app-template-desc">Simple blog with posts</div>
+          </div>
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="sidebar-footer-item" onclick="openSettings()">
+          <span class="material-symbols-outlined">settings</span>
+          Settings
+        </button>
+      </div>
+    </aside>
+
+    <!-- Overlay (mobile sidebar) -->
+    <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+    <!-- ═══ MAIN ═══ -->
+    <main class="main">
+      <!-- Top Bar -->
+      <div class="topbar">
+        <div class="topbar-left">
+          <button class="topbar-menu-btn" onclick="toggleSidebar()">
+            <span class="material-symbols-outlined">menu</span>
+          </button>
+          <div class="sidebar-brand" style="gap:8px;">
+            <div class="sidebar-brand-icon" style="width:24px;height:24px;border-radius:6px;">
+              <span class="surya-logo"><svg width="14" height="14" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="32" r="14" fill="#fff"/><g stroke="#fff" stroke-width="3.5" stroke-linecap="round"><line x1="32" y1="4" x2="32" y2="13"/><line x1="32" y1="51" x2="32" y2="60"/><line x1="4" y1="32" x2="13" y2="32"/><line x1="51" y1="32" x2="60" y2="32"/><line x1="12.2" y1="12.2" x2="18.6" y2="18.6"/><line x1="45.4" y1="45.4" x2="51.8" y2="51.8"/><line x1="12.2" y1="51.8" x2="18.6" y2="45.4"/><line x1="45.4" y1="18.6" x2="51.8" y2="12.2"/></g></svg></span>
+            </div>
+            <span style="font-size:15px;font-weight:600;">Surya AI</span>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <div class="user-menu">
+            <div class="avatar-btn" id="avatarBtn" data-health="" title="Surya AI Status" onclick="toggleUserMenu()">S</div>
+            <div class="user-menu-dropdown" id="userMenuDropdown">
+              <div class="user-menu-header" id="userMenuHeader">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+                  <div class="surya-logo" style="width:28px;height:28px;background:var(--accent);border-radius:8px;padding:4px;">
+                    <svg viewBox="0 0 100 100" width="20" height="20"><circle cx="50" cy="50" r="18" fill="white"/><g stroke="white" stroke-width="5" stroke-linecap="round"><line x1="50" y1="8" x2="50" y2="22"/><line x1="50" y1="78" x2="50" y2="92"/><line x1="8" y1="50" x2="22" y2="50"/><line x1="78" y1="50" x2="92" y2="50"/><line x1="20" y1="20" x2="30" y2="30"/><line x1="70" y1="70" x2="80" y2="80"/><line x1="80" y1="20" x2="70" y2="30"/><line x1="30" y1="70" x2="20" y2="80"/></g></svg>
+                  </div>
+                  <div>
+                    <div class="user-name" id="userMenuName">Guest</div>
+                    <div class="user-email" id="userMenuEmail">Not signed in</div>
+                  </div>
+                </div>
+              </div>
+              <button class="user-menu-item" id="userMenuAuth" onclick="showAuthOverlay()">
+                <span class="material-symbols-outlined">login</span>Sign In
+              </button>
+              <button class="user-menu-item" onclick="openSettings(); closeUserMenu();">
+                <span class="material-symbols-outlined">settings</span>Settings
+              </button>
+              <button class="user-menu-item" id="userMenuSignOut" onclick="signOut()" style="display:none;color:var(--error);">
+                <span class="material-symbols-outlined" style="color:var(--error);">logout</span>Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Area -->
+      <div class="chat-area" id="chatArea">
+        <div class="welcome" id="welcomeScreen">
+          <div class="welcome-brand">
+            <span class="welcome-brand-badge">Indian Chatbot</span>
+          </div>
+          <div class="welcome-logo">
+            <span class="surya-logo"><svg width="48" height="48" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="32" r="14" fill="#fff"/><g stroke="#fff" stroke-width="3.5" stroke-linecap="round"><line x1="32" y1="4" x2="32" y2="13"/><line x1="32" y1="51" x2="32" y2="60"/><line x1="4" y1="32" x2="13" y2="32"/><line x1="51" y1="32" x2="60" y2="32"/><line x1="12.2" y1="12.2" x2="18.6" y2="18.6"/><line x1="45.4" y1="45.4" x2="51.8" y2="51.8"/><line x1="12.2" y1="51.8" x2="18.6" y2="45.4"/><line x1="45.4" y1="18.6" x2="51.8" y2="12.2"/></g></svg></span>
+          </div>
+          <div class="welcome-title">Surya AI</div>
+          <div class="welcome-made-by">Made by Prabhas</div>
+
+          <div class="welcome-cards" id="welcomeCards"></div>
+        </div>
+
+        <div class="chat-container" id="chatContainer" style="display:none;"></div>
+      </div>
+
+      <!-- Stop button -->
+      <button class="stop-btn" id="stopBtn" onclick="stopGeneration()">
+        <span class="material-symbols-outlined">stop_circle</span>
+        Stop generating
+      </button>
+
+      <!-- Input Area -->
+      <div class="input-area">
+        <div class="input-wrapper">
+          <div class="input-box" id="inputBox">
+            <div class="input-chips-row" id="chipsRow" style="display:none;"></div>
+            <div id="fileBarContainer"></div>
+            <div class="textarea-wrapper">
+              <textarea id="messageInput" rows="1" placeholder="Ask Surya AI..." oninput="autoResize(this); toggleSend();" onkeydown="handleKey(event)"></textarea>
+            </div>
+            <div class="input-bottom">
+              <div class="input-tools">
+                <div style="position:relative;">
+                  <button class="tool-btn" title="Upload" onclick="togglePlusPopup(event)">
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
+                  <div class="plus-popup" id="plusPopup">
+                    <button class="plus-popup-item" onclick="triggerFileUpload('image'); closePlusPopup();">
+                      <span class="material-symbols-outlined">add_photo_alternate</span>
+                      Upload Image
+                    </button>
+                    <button class="plus-popup-item" onclick="triggerFileUpload('file'); closePlusPopup();">
+                      <span class="material-symbols-outlined">attach_file</span>
+                      Upload File
+                    </button>
+                  </div>
+                </div>
+                <div style="position:relative;">
+                  <button class="tool-label-btn" onclick="toggleToolsPopup(event)">
+                    <span class="material-symbols-outlined">build</span>
+                    Tools
+                  </button>
+                  <div class="tools-popup" id="toolsPopup">
+                    <div class="tools-popup-title">Capabilities</div>
+                    <button class="tool-item" onclick="selectTool('Create Image','image')">
+                      <span class="material-symbols-outlined">image</span>
+                      <div>Create Image<div class="tool-item-desc">Generate images from text</div></div>
+                    </button>
+                    <button class="tool-item" onclick="selectTool('Web Search','travel_explore')">
+                      <span class="material-symbols-outlined">travel_explore</span>
+                      <div>Web Search<div class="tool-item-desc">Realtime web search</div></div>
+                    </button>
+                    <button class="tool-item" onclick="selectTool('Code','terminal')">
+                      <span class="material-symbols-outlined">terminal</span>
+                      <div>Code<div class="tool-item-desc">Expert coding assistant</div></div>
+                    </button>
+                    <button class="tool-item" onclick="selectTool('Canvas','dashboard_customize')">
+                      <span class="material-symbols-outlined">dashboard_customize</span>
+                      <div>Canvas<div class="tool-item-desc">Build live Vite web apps</div></div>
+                    </button>
+                    <button class="tool-item tool-item-agent" onclick="selectTool('AI Agent','smart_toy')">
+                      <span class="material-symbols-outlined">smart_toy</span>
+                      <div>AI Agent<div class="tool-item-desc">Autonomous task agent</div></div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button class="tool-btn upgrade-prompt-btn" id="upgradeBtn" title="Upgrade prompt" onclick="upgradePrompt()" style="width:36px;height:36px;display:none;">
+                  <span class="material-symbols-outlined" style="font-size:20px;">edit_square</span>
+                </button>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+                  <span class="material-symbols-outlined">arrow_upward</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="disclaimer">Surya AI can make mistakes. Verify important information. Created by PVS Hariharan.</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="canvas-split-panel">
+    <div class="canvas-split-topbar">
+      <button class="canvas-split-btn" id="canvasSplitRefreshBtn" title="Refresh"><span class="material-symbols-outlined" style="font-size:18px;">refresh</span></button>
+      <button class="canvas-split-btn" id="canvasSplitNewTabBtn" title="Open in new tab"><span class="material-symbols-outlined" style="font-size:18px;">open_in_new</span></button>
+      <div class="canvas-url-bar">/</div>
+      <div style="display:flex;align-items:center;margin-right:2px;">
+        <span style="width:18px;height:18px;border-radius:50%;background:#334155;border:1px solid #2D2D30;display:inline-block;"></span>
+        <span style="width:18px;height:18px;border-radius:50%;background:#475569;border:1px solid #2D2D30;display:inline-block;margin-left:-6px;"></span>
+        <span style="width:18px;height:18px;border-radius:50%;background:#64748b;border:1px solid #2D2D30;display:inline-block;margin-left:-6px;"></span>
+      </div>
+      <button class="canvas-split-btn" id="canvasSplitDeployBtn"><span class="material-symbols-outlined" style="font-size:16px;margin-right:4px;">rocket_launch</span>Deploy</button>
+      <button class="canvas-split-btn" id="canvasSplitExportBtn" title="Export"><span class="material-symbols-outlined" style="font-size:18px;">ios_share</span></button>
+      <button class="canvas-split-btn" id="canvasSplitCodeBtn">Code</button>
+    </div>
+    <div class="canvas-split-body">
+      <iframe id="canvasSplitFrame" title="Canvas Split Preview"></iframe>
+      <pre id="canvasSplitCodeView"></pre>
+    </div>
+  </div>
+
+  <div id="canvas-workspace" class="hidden">
+    <div class="canvas-workspace-topbar">
+      <div class="canvas-workspace-title">Surya AI Canvas Workspace</div>
+      <div class="canvas-workspace-actions">
+        <button class="canvas-workspace-btn" id="canvasBackBtn">Back to Chat</button>
+        <button class="canvas-workspace-btn primary" id="canvasDownloadBtn">Download App</button>
+      </div>
+    </div>
+    <div class="canvas-workspace-main">
+      <section class="canvas-pane">
+        <div class="canvas-pane-header">File Explorer</div>
+        <div class="canvas-file-list" id="canvasFileList"></div>
+      </section>
+      <section class="canvas-pane">
+        <div class="canvas-pane-header">Code Viewer</div>
+        <textarea id="canvasCodeViewer" readonly spellcheck="false"></textarea>
+      </section>
+      <section class="canvas-pane">
+        <div class="canvas-pane-header">Live Preview</div>
+        <iframe id="canvasPreviewFrame" title="Canvas Live Preview"></iframe>
+      </section>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <!-- Auth Overlay -->
+  <div class="auth-overlay" id="authOverlay">
+    <div class="auth-card" id="authCard">
+      <div class="auth-logo">
+        <span class="surya-logo"><svg width="28" height="28" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="14" fill="#fff"/><g stroke="#fff" stroke-width="3.5" stroke-linecap="round"><line x1="32" y1="4" x2="32" y2="13"/><line x1="32" y1="51" x2="32" y2="60"/><line x1="4" y1="32" x2="13" y2="32"/><line x1="51" y1="32" x2="60" y2="32"/><line x1="12.2" y1="12.2" x2="18.6" y2="18.6"/><line x1="45.4" y1="45.4" x2="51.8" y2="51.8"/><line x1="12.2" y1="51.8" x2="18.6" y2="45.4"/><line x1="45.4" y1="18.6" x2="51.8" y2="12.2"/></g></svg></span>
+      </div>
+      <h2 id="authTitle">Welcome to Surya AI</h2>
+      <div class="auth-subtitle" id="authSubtitle">Sign in to sync your chats across devices</div>
+
+      <div class="auth-error" id="authError"></div>
+
+      <div id="authNameField" style="display:none;">
+        <input type="text" class="auth-input" id="authName" placeholder="Full name" />
+      </div>
+      <input type="email" class="auth-input" id="authEmail" placeholder="Email address" />
+      <div class="password-wrapper">
+        <input type="password" class="auth-input" id="authPassword" placeholder="Password" />
+        <button type="button" class="password-toggle" onclick="togglePassword()" title="Show/Hide password">
+          <span class="material-symbols-outlined" id="passwordEyeIcon">visibility_off</span>
+        </button>
+      </div>
+
+      <button class="auth-btn" id="authBtn" onclick="handleAuth()">Sign In</button>
+
+      <div class="auth-divider">or continue with</div>
+
+      <div class="auth-oauth-row">
+        <button class="auth-oauth-btn" onclick="oauthLogin('google')" style="flex: none; padding: 10px 32px;">
+          <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Continue with Google
+        </button>
+      </div>
+
+      <div id="forgotPasswordLink" style="font-size:13px;margin-bottom:8px;">
+        <a onclick="forgotPassword()" style="color:var(--accent);cursor:pointer;">Forgot Password?</a>
+      </div>
+
+      <div class="auth-toggle" id="authToggle">
+        Don't have an account? <a onclick="toggleAuthMode()">Sign Up</a>
+      </div>
+
+      <!-- Sign in required to use Surya AI -->
+    </div>
+
+    <!-- Verification Code Card -->
+    <div class="auth-card" id="verifyCard" style="display:none;">
+      <div class="auth-logo">
+        <span class="material-symbols-outlined" style="font-size:36px; color: var(--accent);">mark_email_read</span>
+      </div>
+      <h2>Check your email</h2>
+      <div class="auth-subtitle" id="verifySubtitle">We sent a 6-digit code to your email</div>
+
+      <div class="auth-error" id="verifyError"></div>
+
+      <div style="display: flex; gap: 8px; justify-content: center; margin: 20px 0;">
+        <input type="text" class="auth-input" id="otpInput1" maxlength="1" style="width:48px; height:56px; text-align:center; font-size:24px; font-weight:700; padding:0;" oninput="otpNext(this, 1)" onkeydown="otpBack(event, 1)" />
+        <input type="text" class="auth-input" id="otpInput2" maxlength="1" style="width:48px; height:56px; text-align:center; font-size:24px; font-weight:700; padding:0;" oninput="otpNext(this, 2)" onkeydown="otpBack(event, 2)" />
+        <input type="text" class="auth-input" id="otpInput3" maxlength="1" style="width:48px; height:56px; text-align:center; font-size:24px; font-weight:700; padding:0;" oninput="otpNext(this, 3)" onkeydown="otpBack(event, 3)" />
+        <input type="text" class="auth-input" id="otpInput4" maxlength="1" style="width:48px; height:56px; text-align:center; font-size:24px; font-weight:700; padding:0;" oninput="otpNext(this, 4)" onkeydown="otpBack(event, 4)" />
+        <input type="text" class="auth-input" id="otpInput5" maxlength="1" style="width:48px; height:56px; text-align:center; font-size:24px; font-weight:700; padding:0;" oninput="otpNext(this, 5)" onkeydown="otpBack(event, 5)" />
+        <input type="text" class="auth-input" id="otpInput6" maxlength="1" style="width:48px; height:56px; text-align:center; font-size:24px; font-weight:700; padding:0;" oninput="otpNext(this, 6)" onkeydown="otpBack(event, 6)" />
+      </div>
+
+      <button class="auth-btn" id="verifyBtn" onclick="verifyCode()">Verify & Create Account</button>
+
+      <div style="margin-top: 16px; font-size: 13px; color: var(--text-secondary);">
+        Didn't receive the code? <a onclick="resendCode()" style="color: var(--accent); cursor: pointer;" id="resendLink">Resend</a>
+      </div>
+
+      <div style="margin-top: 12px; font-size: 13px;">
+        <a onclick="backToSignup()" style="color: var(--text-secondary); cursor: pointer;">← Back to sign up</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-overlay" id="settingsOverlay" onclick="closeSettings()">
+    <div class="settings-modal" onclick="event.stopPropagation()">
+      <div class="settings-header">
+        <h2 class="settings-title">Settings</h2>
+        <button class="icon-btn" onclick="closeSettings()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-section">
+          <div class="settings-section-title">Appearance</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="material-symbols-outlined">palette</span>
+              <div>
+                <div class="settings-row-label">Theme</div>
+                <div class="settings-row-desc">Switch between light and dark mode</div>
+              </div>
+            </div>
+            <div class="theme-switch" id="themeSwitch" onclick="toggleTheme()">
+              <div class="theme-switch-track">
+                <div class="theme-switch-thumb">
+                  <span class="material-symbols-outlined" id="switchIcon">dark_mode</span>
+                </div>
+              </div>
+              <span id="switchLabel" class="theme-switch-label">Dark</span>
+            </div>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Customization</div>
+          <div class="settings-row" style="flex-wrap:wrap;">
+            <div class="settings-row-info">
+              <span class="material-symbols-outlined">person</span>
+              <div>
+                <div class="settings-row-label">Your Role</div>
+                <div class="settings-row-desc">Surya AI adapts its answers to match your role</div>
+              </div>
+            </div>
+            <select id="userRoleSelect" onchange="setUserRole(this.value)" style="padding:8px 12px;border:1px solid var(--border-primary);background:var(--bg-secondary);color:var(--text-primary);border-radius:8px;font-size:13px;cursor:pointer;">
+              <option value="general">General</option>
+              <option value="student">Student</option>
+              <option value="developer">Developer</option>
+              <option value="administrator">Administrator</option>
+              <option value="engineer">Engineer</option>
+            </select>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Memory</div>
+          <div class="settings-row" style="flex-wrap:wrap;">
+            <div class="settings-row-info">
+              <span class="material-symbols-outlined">psychology</span>
+              <div>
+                <div class="settings-row-label">Saved Memories</div>
+                <div class="settings-row-desc">Facts Surya AI remembers about you</div>
+              </div>
+            </div>
+            <button class="settings-connect-btn" onclick="toggleMemoryList()" id="memoryToggleBtn">View</button>
+            <div id="memoryListContainer" style="display:none;width:100%;margin-top:8px;">
+              <div id="memoryList" style="max-height:200px;overflow-y:auto;"></div>
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <button class="settings-connect-btn" onclick="clearAllMemories()" style="border-color:#ef4444;color:#ef4444;">Clear All</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">Data</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="material-symbols-outlined">delete_sweep</span>
+              <div>
+                <div class="settings-row-label">Clear All Chats</div>
+                <div class="settings-row-desc">Delete all conversation history</div>
+              </div>
+            </div>
+            <button class="settings-danger-btn" onclick="clearAllChats()">Clear</button>
+          </div>
+        </div>
+        <div class="settings-section" id="deleteAccountSection" style="display:none;">
+          <div class="settings-section-title" style="color: #ef4444;">Danger Zone</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="material-symbols-outlined" style="color: #ef4444;">person_remove</span>
+              <div>
+                <div class="settings-row-label">Delete Account</div>
+                <div class="settings-row-desc">Permanently delete your account and all data</div>
+              </div>
+            </div>
+            <button class="settings-danger-btn" onclick="confirmDeleteAccount()" style="background: rgba(239,68,68,0.15); color: #ef4444; border-color: rgba(239,68,68,0.3);">Delete</button>
+          </div>
+        </div>
+        <div class="settings-section" id="connectorsSection">
+          <div class="settings-section-title">Connectors</div>
+          <div class="settings-row">
+            <div class="settings-row-info">
+              <span class="material-symbols-outlined" style="color: #4285f4;">cloud</span>
+              <div>
+                <div class="settings-row-label">Google Workspace</div>
+                <div class="settings-row-desc" id="gwStatusText">Connect to access Docs, Slides & Sheets</div>
+              </div>
+            </div>
+            <button class="settings-connect-btn" id="gwConnectBtn" onclick="toggleGoogleWorkspace()">Connect</button>
+          </div>
+          <div class="settings-row" style="flex-wrap: wrap;">
+            <div class="settings-row-info">
+              <span class="material-symbols-outlined" style="color: #3ECF8E;">database</span>
+              <div>
+                <div class="settings-row-label">Supabase</div>
+                <div class="settings-row-desc" id="supabaseStatusText">Connect to enable database in Canvas apps</div>
+              </div>
+            </div>
+            <button class="settings-connect-btn" id="supabaseConnectBtn" onclick="toggleSupabase()">Connect</button>
+            <div class="supabase-inputs" id="supabaseInputs" style="display:none;">
+              <input type="url" id="supabaseUrlInput" placeholder="Project URL (e.g. https://xyz.supabase.co)" />
+              <input type="text" id="supabaseAnonKeyInput" placeholder="Anon Key (public)" />
+              <input type="password" id="supabaseAccessTokenInput" placeholder="Access Token (from supabase.com/dashboard/account/tokens)" />
+            </div>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">About</div>
+          <div class="settings-about">
+            <strong>Surya AI</strong> v1.0<br>
+            Created by PVS Hariharan<br>
+            Powered by InsForge
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input -->
+  <input type="file" id="fileInput" style="display:none" />
+
+  <!-- Drop overlay -->
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-overlay-inner">
+      <span class="material-symbols-outlined">cloud_upload</span>
+      <p>Drop your file here</p>
+      <span>Images, code, documents</span>
+    </div>
+  </div>
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <!-- External JavaScript Files -->
+  <script src="js/main.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/canvas.js"></script>
+  <script src="js/memory.js"></script>
+
+</body>
+</html>

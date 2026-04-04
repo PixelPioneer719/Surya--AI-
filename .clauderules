@@ -1,0 +1,52 @@
+# Surya AI - Global Behavior Rules
+
+## Core Principles
+- **No Express.js**: Use native Node.js HTTP server only
+- **Vanilla JavaScript**: No React, Vue, or heavy frameworks in core app
+- **Modular Architecture**: Separate JS and CSS files, logical component organization
+- **Security First**: All API keys server-side only, never exposed to client
+- **Performance Focus**: Optimize for speed, minimal bundle size
+
+## Code Style Rules
+- **ES6+ Only**: Arrow functions, destructuring, template literals, async/await
+- **Consistent Naming**: camelCase for variables/functions, PascalCase for classes
+- **Error Handling**: Try/catch blocks for all async operations
+- **Comments**: JSDoc for functions, inline comments for complex logic
+
+## Architecture Constraints
+- **Backend**: Native Node.js HTTP server with custom routing
+- **Frontend**: Single-page application with vanilla JS
+- **Storage**: JSON file-based (users.json, chats.json) - no databases yet
+- **Authentication**: PBKDF2 password hashing, JWT-like bearer tokens
+- **APIs**: Server-side proxy for all external services (InsForge, Google, etc.)
+
+## Canvas IDE Rules
+- **WebContainer Only**: No Blob URLs or iframe hacks
+- **Vite + Tailwind**: Enforced tech stack for generated projects
+- **Cross-Origin Isolation**: COOP + COEP headers required
+- **Secure Context**: HTTPS or localhost only for SharedArrayBuffer
+
+## Development Workflow
+- **Testing**: Manual testing in browser, console logging for debugging
+- **Version Control**: Git with feature branches, descriptive commit messages
+- **Documentation**: Update docs on architecture changes
+- **Security**: Never commit API keys or sensitive data
+
+## File Organization
+- **Root Level**: Core config files (CLAUDE.md, .clauderules, package.json)
+- **frontend/**: HTML, CSS, JS modules (modular structure)
+- **backend/**: Server-side logic and API handlers
+- **data/**: JSON storage files (users, chats)
+- **docs/**: Documentation and guides
+
+## Quality Standards
+- **Performance**: < 3 second load times, < 500KB bundle size
+- **Accessibility**: WCAG 2.1 AA compliance, keyboard navigation
+- **Security**: OWASP top 10 compliance, input validation
+- **Maintainability**: Modular code, clear separation of concerns
+
+## AI Interaction Rules
+- **Context Awareness**: Understand current project phase and architecture
+- **Helpful Suggestions**: Provide actionable feedback and improvements
+- **Code Quality**: Ensure generated code follows project standards
+- **Documentation**: Update relevant docs when making architectural changes

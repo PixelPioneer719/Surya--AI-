@@ -1,0 +1,40 @@
+[
+  {
+    "id": "531b5b98-1e8f-4494-853f-12f9c5fcebfe",
+    "email": "test@test.com",
+    "name": "test",
+    "avatar": null,
+    "provider": "insforge",
+    "verified": true,
+    "token": null,
+    "createdAt": "2026-04-03T06:26:45.438Z",
+    "supabase": {
+      "connected": false,
+      "connectedAt": null,
+      "url": null,
+      "anonKey": null,
+      "accessToken": null,
+      "projectRef": null
+    }
+  },
+  {
+    "id": "90f55fc7-c779-423a-880e-9dd1e21d167f",
+    "email": "sjnanaviswaroop19@gmail.com",
+    "name": "sjnanaviswaroop19",
+    "avatar": null,
+    "provider": "insforge",
+    "verified": true,
+    "token": null,
+    "createdAt": "2026-04-03T06:27:36.494Z"
+  },
+  {
+    "id": "104256f8-f543-41c9-a90a-bdc430e28b59",
+    "email": "pvshariharan324@gmail.com",
+    "name": "pvshariharan324",
+    "avatar": null,
+    "provider": "insforge",
+    "verified": true,
+    "token": null,
+    "createdAt": "2026-04-03T11:06:17.378Z"
+  }
+]

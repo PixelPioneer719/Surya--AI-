@@ -1069,6 +1069,194 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ═══════════════════════════════════════════════════
+  //  SUPABASE CONNECTOR
+  // ═══════════════════════════════════════════════════
+
+  if (req.url === '/api/connectors/supabase/connect' && req.method === 'POST') {
+    parseBody(req).then((payload) => {
+      const user = resolveUserFromRequest(req, payload || {});
+      if (!user) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not authenticated' }));
+        return;
+      }
+      const url = (payload.url || '').trim();
+      const anonKey = (payload.anonKey || '').trim();
+      const accessToken = (payload.accessToken || '').trim();
+      if (!url || !anonKey) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing url or anonKey' }));
+        return;
+      }
+      if (!url.startsWith('https://') || !url.includes('.supabase.co')) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid Supabase URL' }));
+        return;
+      }
+      const projectRef = url.replace('https://', '').split('.')[0];
+      const users = readUsers();
+      const u = users.find(x => x.id === user.id) || user;
+      u.supabase = {
+        connected: true,
+        connectedAt: new Date().toISOString(),
+        url,
+        anonKey,
+        accessToken: accessToken || null,
+        projectRef
+      };
+      writeUsers(users);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    }).catch(() => {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+    });
+    return;
+  }
+
+  if (req.url === '/api/connectors/supabase/status' && req.method === 'GET') {
+    const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not authenticated' }));
+      return;
+    }
+    const sb = user.supabase || null;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      connected: Boolean(sb && sb.connected),
+      connectedAt: sb && sb.connectedAt ? sb.connectedAt : null,
+      url: sb && sb.url ? sb.url : null,
+      anonKey: sb && sb.anonKey ? sb.anonKey : null
+    }));
+    return;
+  }
+
+  if (req.url === '/api/connectors/supabase/disconnect' && req.method === 'POST') {
+    const token = getTokenFromReq(req);
+    const users = readUsers();
+    const user = users.find(u =>
+      (token && u.token === token) ||
+      ((u.email || '').toLowerCase() === ((req.headers['x-surya-user-email'] || '').toString().toLowerCase()))
+    );
+    if (!user) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not authenticated' }));
+      return;
+    }
+    user.supabase = {
+      connected: false,
+      connectedAt: null,
+      url: null,
+      anonKey: null,
+      accessToken: null,
+      projectRef: null
+    };
+    writeUsers(users);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  if (req.url === '/api/integrations/supabase/provision' && req.method === 'POST') {
+    try {
+      const payload = await parseBody(req);
+      const user = resolveUserFromRequest(req, payload || {});
+      if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+      const sb = user.supabase;
+      if (!sb || !sb.connected) return makeJsonResponse(res, 400, { error: 'Supabase not connected' });
+      if (!sb.accessToken) return makeJsonResponse(res, 400, { error: 'Access Token required for auto-provisioning. Add it in Settings → Connectors → Supabase.' });
+      const schema = (payload.schema || '').trim();
+      if (!schema) return makeJsonResponse(res, 400, { error: 'No schema provided' });
+
+      const body = JSON.stringify({ query: schema });
+      const provisionRes = await httpsJsonRequest({
+        hostname: 'api.supabase.com',
+        path: `/v1/projects/${sb.projectRef}/database/query`,
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sb.accessToken}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        },
+        body
+      });
+
+      if (provisionRes.statusCode >= 200 && provisionRes.statusCode < 300) {
+        makeJsonResponse(res, 200, { success: true, result: provisionRes.data });
+      } else {
+        makeJsonResponse(res, provisionRes.statusCode || 500, {
+          error: 'Provisioning failed',
+          detail: provisionRes.data || provisionRes.raw
+        });
+      }
+    } catch (e) {
+      makeJsonResponse(res, 500, { error: 'Provisioning error', detail: e.message });
+    }
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════
+  //  MASTER MEMORY ENDPOINTS
+  // ═══════════════════════════════════════════════════
+
+  if (req.url === '/api/memory/list' && req.method === 'GET') {
+    const user = findUserByAuthToken(getTokenFromReq(req));
+    if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+    return makeJsonResponse(res, 200, { memories: user.memories || [] });
+  }
+
+  if (req.url === '/api/memory/save' && req.method === 'POST') {
+    try {
+      const payload = await parseBody(req);
+      const user = findUserByAuthToken(getTokenFromReq(req));
+      if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+      const fact = (payload.fact || '').trim();
+      if (!fact) return makeJsonResponse(res, 400, { error: 'No fact provided' });
+      const users = readUsers();
+      const u = users.find(x => x.email === user.email || (x.childName && x.childName === user.childName));
+      if (!u) return makeJsonResponse(res, 404, { error: 'User not found' });
+      if (!u.memories) u.memories = [];
+      // Prevent duplicates
+      if (u.memories.some(m => m.fact.toLowerCase() === fact.toLowerCase())) {
+        return makeJsonResponse(res, 200, { success: true, message: 'Already saved' });
+      }
+      u.memories.push({ id: crypto.randomBytes(8).toString('hex'), fact, createdAt: new Date().toISOString() });
+      writeUsers(users);
+      return makeJsonResponse(res, 200, { success: true });
+    } catch (e) {
+      return makeJsonResponse(res, 500, { error: e.message });
+    }
+  }
+
+  if (req.url === '/api/memory/delete' && req.method === 'DELETE') {
+    try {
+      const payload = await parseBody(req);
+      const user = findUserByAuthToken(getTokenFromReq(req));
+      if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+      const users = readUsers();
+      const u = users.find(x => x.email === user.email || (x.childName && x.childName === user.childName));
+      if (!u) return makeJsonResponse(res, 404, { error: 'User not found' });
+      u.memories = (u.memories || []).filter(m => m.id !== payload.id);
+      writeUsers(users);
+      return makeJsonResponse(res, 200, { success: true });
+    } catch (e) {
+      return makeJsonResponse(res, 500, { error: e.message });
+    }
+  }
+
+  if (req.url === '/api/memory/clear' && req.method === 'POST') {
+    const user = findUserByAuthToken(getTokenFromReq(req));
+    if (!user) return makeJsonResponse(res, 401, { error: 'Not authenticated' });
+    const users = readUsers();
+    const u = users.find(x => x.email === user.email || (x.childName && x.childName === user.childName));
+    if (!u) return makeJsonResponse(res, 404, { error: 'User not found' });
+    u.memories = [];
+    writeUsers(users);
+    return makeJsonResponse(res, 200, { success: true });
+  }
+
   if (req.url.startsWith('/api/google-workspace/drive/files') && req.method === 'GET') {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     const user = resolveUserFromRequest(req, { userEmail: req.headers['x-surya-user-email'] || '' });
@@ -1542,103 +1730,49 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Image generation API — uses Stable Horde (free, reliable)
-  if (req.url.startsWith('/api/image?')) {
-    const urlParams = new URL(req.url, `http://localhost:${PORT}`);
-    const prompt = urlParams.searchParams.get('prompt') || 'beautiful landscape';
-
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Type', 'application/json');
-
-    // Step 1: Submit generation request
-    const postData = JSON.stringify({
-      prompt: prompt + ', high quality, detailed, 4k',
-      params: { width: 512, height: 512, steps: 25 },
-      nsfw: false,
-      censor_nsfw: true
-    });
-
-    const submitReq = https.request({
-      hostname: 'stablehorde.net',
-      path: '/api/v2/generate/async',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': '0000000000',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    }, (submitRes) => {
-      let body = '';
-      submitRes.on('data', d => body += d);
-      submitRes.on('end', () => {
-        try {
-          const data = JSON.parse(body);
-          if (!data.id) {
-            res.writeHead(500);
-            res.end(JSON.stringify({ error: 'Failed to submit', detail: body }));
-            return;
-          }
-          // Return the job ID — frontend will poll for status
-          res.writeHead(200);
-          res.end(JSON.stringify({ id: data.id, status: 'processing' }));
-        } catch (e) {
-          res.writeHead(500);
-          res.end(JSON.stringify({ error: 'Parse error' }));
-        }
-      });
-    });
-    submitReq.on('error', (e) => {
-      res.writeHead(500);
-      res.end(JSON.stringify({ error: e.message }));
-    });
-    submitReq.write(postData);
-    submitReq.end();
-    return;
-  }
-
-  // Image generation status check
-  if (req.url.startsWith('/api/image-status?')) {
-    const urlParams = new URL(req.url, `http://localhost:${PORT}`);
-    const jobId = urlParams.searchParams.get('id');
-
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Type', 'application/json');
-
-    if (!jobId) {
-      res.writeHead(400);
-      res.end(JSON.stringify({ error: 'Missing job ID' }));
+  // Image generation API — InsForge proxy (keeps API key server-side)
+  if (req.url === '/api/ai/image/generation' && req.method === 'POST') {
+    if (!INSFORGE_BASE || !INSFORGE_API_KEY) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing INSFORGE_BASE / INSFORGE_API_KEY in .env' }));
       return;
     }
+    try {
+      const payload = await parseBody(req);
+      const target = new URL('/api/ai/image/generation', INSFORGE_BASE);
+      const body = JSON.stringify(payload || {});
 
-    https.get(`https://stablehorde.net/api/v2/generate/status/${jobId}`, (statusRes) => {
-      let body = '';
-      statusRes.on('data', d => body += d);
-      statusRes.on('end', () => {
-        try {
-          const data = JSON.parse(body);
-          if (data.done && data.generations && data.generations.length > 0) {
-            res.writeHead(200);
-            res.end(JSON.stringify({
-              done: true,
-              imageUrl: data.generations[0].img
-            }));
-          } else {
-            res.writeHead(200);
-            res.end(JSON.stringify({
-              done: false,
-              waitTime: data.wait_time || 0,
-              queuePosition: data.queue_position || 0
-            }));
+      const upstream = https.request(
+        {
+          hostname: target.hostname,
+          path: target.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': INSFORGE_API_KEY,
+            'Content-Length': Buffer.byteLength(body)
           }
-        } catch (e) {
-          res.writeHead(500);
-          res.end(JSON.stringify({ error: 'Parse error' }));
+        },
+        (up) => {
+          res.writeHead(up.statusCode || 200, {
+            'Content-Type': up.headers['content-type'] || 'application/json',
+            'Cache-Control': 'no-cache'
+          });
+          up.pipe(res);
         }
+      );
+
+      upstream.on('error', (e) => {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Image generation failed', detail: e.message }));
       });
-    }).on('error', (e) => {
-      res.writeHead(500);
-      res.end(JSON.stringify({ error: e.message }));
-    });
+
+      upstream.write(body);
+      upstream.end();
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Image generation error', detail: e.message }));
+    }
     return;
   }
 
@@ -1655,7 +1789,7 @@ const server = http.createServer(async (req, res) => {
   const frontendDist = path.join(__dirname, 'frontend', 'dist');
   const frontendDir = fs.existsSync(path.join(frontendDist, 'index.html'))
     ? frontendDist
-    : path.join(__dirname, 'frontend');
+    : path.join(__dirname, 'frontend', 'html');
 
   const parsedPath = url.parse(req.url).pathname;
   let filePath = parsedPath === '/' ? '/index.html' : parsedPath;
