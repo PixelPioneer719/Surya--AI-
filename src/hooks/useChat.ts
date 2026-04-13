@@ -3,7 +3,7 @@
 import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useChatStore } from "@/stores/chatStore";
-import type { StreamEvent, Message, ArtifactType } from "@/types/chat";
+import type { StreamEvent, Message, ArtifactType, SearchResult } from "@/types/chat";
 const randomUUID = () => crypto.randomUUID();
 
 export function useChat(projectId?: string) {
@@ -16,12 +16,14 @@ export function useChat(projectId?: string) {
     streamingContent,
     thinkingEnabled,
     enableConnectors,
+    enableWebSearch,
     activeConversationId,
     addMessage,
     updateStreamingContent,
     setIsStreaming,
     setActiveConversation,
     setEnableConnectors,
+    setEnableWebSearch,
     resetStream,
   } = useChatStore();
 
@@ -56,6 +58,7 @@ export function useChat(projectId?: string) {
             conversationId: convId,
             projectId: projectId ?? undefined,
             enableConnectors,
+            enableWebSearch,
           }),
           signal: abortRef.current.signal,
         });
@@ -70,6 +73,7 @@ export function useChat(projectId?: string) {
         let streamedText = "";
         let streamedThinking = "";
         const streamedArtifacts: ArtifactType[] = [];
+        let pendingSearchResults: SearchResult[] = [];
         let newConvId: string | null = null;
 
         while (true) {
@@ -116,6 +120,11 @@ export function useChat(projectId?: string) {
                   }
                 }
                 break;
+              case "search_results":
+                pendingSearchResults = event.searchResults ?? [];
+                break;
+              case "research_progress":
+                break;
               case "done":
                 newConvId = event.content ?? null;
                 break;
@@ -133,6 +142,7 @@ export function useChat(projectId?: string) {
           content: streamedText,
           artifacts: streamedArtifacts,
           thinking: streamedThinking || undefined,
+          searchResults: pendingSearchResults.length > 0 ? pendingSearchResults : undefined,
           createdAt: new Date().toISOString(),
         };
         addMessage(assistantMsg);
@@ -164,11 +174,13 @@ export function useChat(projectId?: string) {
       activeConversationId,
       thinkingEnabled,
       enableConnectors,
+      enableWebSearch,
       addMessage,
       updateStreamingContent,
       setIsStreaming,
       setActiveConversation,
       setEnableConnectors,
+      setEnableWebSearch,
       resetStream,
       router,
     ]
@@ -187,5 +199,7 @@ export function useChat(projectId?: string) {
     stopStreaming,
     enableConnectors,
     setEnableConnectors,
+    enableWebSearch,
+    setEnableWebSearch,
   };
 }

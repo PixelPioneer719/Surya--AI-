@@ -6,6 +6,7 @@
 export const MODEL_MAP = {
   sonnet: "anthropic/claude-sonnet-4.6", // default — fast, everyday tasks
   opus:   "anthropic/claude-opus-4.6",   // heavy tasks + Extended Thinking
+  gemini: process.env.WEB_SEARCH_MODEL ?? "gemini-3.1-pro-preview-05-06", // web search synthesis + learning
 } as const;
 
 export type ModelKey = keyof typeof MODEL_MAP;
@@ -15,7 +16,20 @@ export const DEFAULT_MODEL: ModelKey = "sonnet";
 export const MAX_TOKENS: Record<ModelKey, number> = {
   sonnet: 8192,
   opus:   16000,
+  gemini: 8192,
 } as const;
+
+/**
+ * Task-based model routing — always use this instead of hardcoding model strings.
+ * Claude = all coding. Gemini = web search synthesis, learning content.
+ */
+export const TASK_MODEL_MAP = {
+  webSearch:    "gemini",
+  deepResearch: "opus",
+  flashcards:   "gemini",
+  studyGuide:   "gemini",
+  quiz:         "gemini",
+} as const satisfies Partial<Record<string, ModelKey>>;
 
 export const THINKING_BUDGET = 10000;
 

@@ -170,6 +170,24 @@ export const CONNECTOR_TOOLS = [
     },
   },
 
+  // Web Search
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description:
+        "Search the web for current information, recent events, or facts you may not know. Returns titles, snippets, and URLs with citation numbers. Always use when user asks about recent events or explicitly requests web search.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The search query" },
+          limit: { type: "number", description: "Number of results to return (1-10, default 5)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+
   // GitHub
   {
     type: "function",
@@ -234,6 +252,7 @@ export const CONNECTOR_TOOLS = [
 // ---------------------------------------------------------------------------
 
 const TOOL_ROUTE_MAP: Record<string, { path: string; action: string }> = {
+  web_search:             { path: "/api/connectors/search",   action: "search" },
   gmail_search:           { path: "/api/connectors/gmail",    action: "search" },
   gmail_read:             { path: "/api/connectors/gmail",    action: "read" },
   gmail_send:             { path: "/api/connectors/gmail",    action: "send" },
@@ -246,6 +265,20 @@ const TOOL_ROUTE_MAP: Record<string, { path: string; action: string }> = {
   github_list_issues:     { path: "/api/connectors/github",   action: "list_issues" },
   github_create_issue:    { path: "/api/connectors/github",   action: "create_issue" },
 };
+
+// ---------------------------------------------------------------------------
+// Filtered tool sets
+// ---------------------------------------------------------------------------
+
+/** Only the web_search tool — added conditionally when enableWebSearch is true */
+export const WEB_SEARCH_TOOLS = CONNECTOR_TOOLS.filter(
+  (t) => t.function.name === "web_search"
+);
+
+/** All connector tools except web_search — combined with WEB_SEARCH_TOOLS when both flags are on */
+export const CONNECTOR_TOOLS_WITHOUT_SEARCH = CONNECTOR_TOOLS.filter(
+  (t) => t.function.name !== "web_search"
+);
 
 // ---------------------------------------------------------------------------
 // Executor

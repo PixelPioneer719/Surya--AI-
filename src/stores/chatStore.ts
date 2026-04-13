@@ -11,6 +11,8 @@ interface ChatStore {
   thinkingEnabled: boolean;
   /** When true, Claude is given tool definitions to call Google/GitHub connectors */
   enableConnectors: boolean;
+  /** When true, the chat API will perform web search before responding */
+  enableWebSearch: boolean;
 
   setConversations: (conversations: Conversation[]) => void;
   setActiveConversation: (id: string | null) => void;
@@ -20,6 +22,7 @@ interface ChatStore {
   setIsStreaming: (isStreaming: boolean) => void;
   setThinkingEnabled: (enabled: boolean) => void;
   setEnableConnectors: (enabled: boolean) => void;
+  setEnableWebSearch: (enabled: boolean) => void;
   resetStream: () => void;
 }
 
@@ -31,6 +34,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   streamingContent: "",
   thinkingEnabled: false,
   enableConnectors: false,
+  enableWebSearch: false,
 
   setConversations: (conversations) => set({ conversations }),
   setActiveConversation: (id) => set({ activeConversationId: id }),
@@ -40,5 +44,6 @@ export const useChatStore = create<ChatStore>((set) => ({
   setIsStreaming: (isStreaming) => set({ isStreaming }),
   setThinkingEnabled: (thinkingEnabled) => set({ thinkingEnabled }),
   setEnableConnectors: (enableConnectors) => set({ enableConnectors }),
+  setEnableWebSearch: (enableWebSearch) => set({ enableWebSearch }),
   resetStream: () => set({ streamingContent: "", isStreaming: false }),
 }));

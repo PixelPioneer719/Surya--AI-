@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { aiClient, MODEL_MAP, MAX_TOKENS, THINKING_BUDGET } from "@/lib/ai/client";
-import { selectModel } from "@/lib/ai/models";
-import { CONNECTOR_TOOLS, executeTool } from "@/lib/ai/tools";
+import { selectModel, TASK_MODEL_MAP } from "@/lib/ai/models";
+import { CONNECTOR_TOOLS_WITHOUT_SEARCH, WEB_SEARCH_TOOLS, executeTool } from "@/lib/ai/tools";
 import { db } from "@/lib/insforge";
 import { getCached, setCache } from "@/lib/knowledge-cache";
 import type { ChatRequest, Message, ArtifactType, StreamEvent } from "@/types/chat";
@@ -92,7 +92,7 @@ export async function POST(req: Request) {
   }
 
   const body: ChatRequest = await req.json();
-  const { message, thinking = false, conversationId, projectId, enableConnectors = false } = body;
+  const { message, thinking = false, conversationId, projectId, enableConnectors = false, enableWebSearch = false } = body;
 
   if (!message?.trim()) {
     return new Response("Message required", { status: 400 });
@@ -211,7 +211,11 @@ You are helpful, clear, and direct. For code, documents, or interactive content,
 
   const systemPrompt = projectContext ? `${projectContext}\n\n---\n\n${basePrompt}` : basePrompt;
 
-  const tools = enableConnectors ? CONNECTOR_TOOLS : undefined;
+  const toolList = [
+    ...(enableConnectors ? CONNECTOR_TOOLS_WITHOUT_SEARCH : []),
+    ...(enableWebSearch ? WEB_SEARCH_TOOLS : []),
+  ];
+  const tools = toolList.length > 0 ? toolList : undefined;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -224,6 +228,8 @@ You are helpful, clear, and direct. For code, documents, or interactive content,
         let continueLoop = true;
         const MAX_TOOL_LOOPS = 8;
         let loopCount = 0;
+        // effectiveModel may be swapped to Gemini after a web_search tool call
+        let effectiveModel = modelId;
 
         while (continueLoop && loopCount < MAX_TOOL_LOOPS) {
           loopCount++;
@@ -236,7 +242,7 @@ You are helpful, clear, and direct. For code, documents, or interactive content,
           let currentLoopContent = "";
 
           const completionParams = {
-            model: modelId,
+            model: effectiveModel,
             messages: [{ role: "system" as const, content: systemPrompt }, ...loopMessages],
             stream: true as const,
             maxTokens: useThinking ? THINKING_BUDGET + maxTokens : maxTokens,
@@ -334,6 +340,18 @@ You are helpful, clear, and direct. For code, documents, or interactive content,
                 toolName: tc.name,
                 content: result,
               });
+
+              // web_search post-processing: emit citation cards + switch synthesis model
+              if (tc.name === "web_search") {
+                try {
+                  const parsed = JSON.parse(result);
+                  if (parsed.results?.length) {
+                    send(controller, { type: "search_results", searchResults: parsed.results });
+                  }
+                } catch { /* ignore parse errors */ }
+                // Route synthesis to Gemini
+                effectiveModel = MODEL_MAP[TASK_MODEL_MAP.webSearch];
+              }
 
               // Append tool result to messages
               loopMessages.push({
