@@ -5,6 +5,18 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Surya AI brand colors */
+  --color-surya-50:     #E8F0FE;
+  --color-surya-500:    #1A73E8;
+  --color-surya-700:    #0D47A1;
+  --color-surya-accent: #4FC3F7;
+
+  /* Dark surface palette */
+  --color-surface-DEFAULT: #0F1117;
+  --color-surface-1:       #1A1D27;
+  --color-surface-2:       #242736;
+  --color-surface-3:       #2E3145;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);

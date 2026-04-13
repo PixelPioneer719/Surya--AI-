@@ -40,7 +40,7 @@ export default function LandingPage() {
 
         {/* Sub-description */}
         <p className="text-sm text-gray-600 max-w-md">
-          Powered by Claude Sonnet & Opus, Gemini Pro. Built for people who want
+          Powered by Claude Sonnet & Opus. Built for people who want
           perfect results — not prompting expertise.
         </p>
 

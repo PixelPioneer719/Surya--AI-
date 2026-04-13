@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -16,7 +16,7 @@ const ARTIFACT_ICONS = {
   interactive: Play,
 } as const;
 
-function ArtifactChip({ artifact }: { artifact: ArtifactType }) {
+const ArtifactChip = memo(function ArtifactChip({ artifact }: { artifact: ArtifactType }) {
   const { setArtifactPanel } = useUIStore();
   const Icon = ARTIFACT_ICONS[artifact.type];
   return (
@@ -31,7 +31,7 @@ function ArtifactChip({ artifact }: { artifact: ArtifactType }) {
       )}
     </button>
   );
-}
+});
 
 interface MessageBubbleProps {
   message: Message;
@@ -39,7 +39,11 @@ interface MessageBubbleProps {
   streamingContent?: string;
 }
 
-export function MessageBubble({
+/**
+ * Memoized — only re-renders when its own message prop or streaming state changes.
+ * Prevents re-render of ALL prior messages on every streaming token.
+ */
+export const MessageBubble = memo(function MessageBubble({
   message,
   isStreaming = false,
   streamingContent = "",
@@ -132,4 +136,4 @@ export function MessageBubble({
       </div>
     </div>
   );
-}
+});

@@ -23,7 +23,7 @@ export async function GET(
 
   const messages = await db.messages("find", {
     filter: { conversationId: id },
-    sort: { createdAt: 1 },
+    sort: { timestamp: 1 },
   });
 
   return Response.json(messages);

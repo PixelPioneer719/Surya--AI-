@@ -34,7 +34,7 @@ export default async function AppLayout({
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-hidden">{children}</main>
+        <main className="flex flex-col flex-1 overflow-hidden relative">{children}</main>
         <MobileNav />
       </div>
     </div>

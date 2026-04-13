@@ -4,7 +4,6 @@ import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useChatStore } from "@/stores/chatStore";
 import type { StreamEvent, Message, ArtifactType } from "@/types/chat";
-import type { ModelKey } from "@/lib/ai/models";
 const randomUUID = () => crypto.randomUUID();
 
 export function useChat(projectId?: string) {
@@ -15,13 +14,14 @@ export function useChat(projectId?: string) {
     messages,
     isStreaming,
     streamingContent,
-    selectedModel,
     thinkingEnabled,
+    enableConnectors,
     activeConversationId,
     addMessage,
     updateStreamingContent,
     setIsStreaming,
     setActiveConversation,
+    setEnableConnectors,
     resetStream,
   } = useChatStore();
 
@@ -52,10 +52,10 @@ export function useChat(projectId?: string) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: content,
-            model: selectedModel as ModelKey,
             thinking: thinkingEnabled,
             conversationId: convId,
             projectId: projectId ?? undefined,
+            enableConnectors,
           }),
           signal: abortRef.current.signal,
         });
@@ -162,12 +162,13 @@ export function useChat(projectId?: string) {
     [
       isStreaming,
       activeConversationId,
-      selectedModel,
       thinkingEnabled,
+      enableConnectors,
       addMessage,
       updateStreamingContent,
       setIsStreaming,
       setActiveConversation,
+      setEnableConnectors,
       resetStream,
       router,
     ]
@@ -184,5 +185,7 @@ export function useChat(projectId?: string) {
     streamingContent,
     sendMessage,
     stopStreaming,
+    enableConnectors,
+    setEnableConnectors,
   };
 }

@@ -94,6 +94,39 @@ const config: NextAuthConfig = {
             updated_at: now,
           });
         }
+
+        // Save OAuth tokens to connector_tokens for Workspace integrations
+        if (account.provider === "google" && account.access_token) {
+          await db.from("connector_tokens").upsert(
+            {
+              email: user.email,
+              provider: "google",
+              access_token: account.access_token,
+              refresh_token: account.refresh_token ?? null,
+              expires_at: account.expires_at
+                ? new Date((account.expires_at as number) * 1000).toISOString()
+                : null,
+              updated_at: now,
+              created_at: now,
+            },
+            { onConflict: "email,provider" }
+          );
+        }
+
+        if (account.provider === "github" && account.access_token) {
+          await db.from("connector_tokens").upsert(
+            {
+              email: user.email,
+              provider: "github",
+              access_token: account.access_token,
+              refresh_token: null,
+              expires_at: null,
+              updated_at: now,
+              created_at: now,
+            },
+            { onConflict: "email,provider" }
+          );
+        }
       } catch (err) {
         // Log but don't block login
         console.error("[auth] signIn callback error:", err);

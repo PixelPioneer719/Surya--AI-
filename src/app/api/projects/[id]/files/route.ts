@@ -75,7 +75,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const buffer = Buffer.from(arrayBuffer);
 
   if (ext === ".pdf") {
-    const pdfParse = (await import("pdf-parse")).default;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfModule = await import("pdf-parse") as any;
+    const pdfParse = pdfModule.default ?? pdfModule;
     const parsed = await pdfParse(buffer);
     rawContent = parsed.text;
   } else if (ext === ".csv") {

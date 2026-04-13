@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, Settings, MessageSquare, FolderOpen } from "lucide-react";
+import { Plus, Settings, MessageSquare, FolderOpen, Search } from "lucide-react";
 import { formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useChatStore } from "@/stores/chatStore";
@@ -32,6 +32,7 @@ export function Sidebar() {
   const { sidebarOpen } = useUIStore();
   const user = useUserStore((s) => s.user);
   const pathname = usePathname();
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetch("/api/conversations")
@@ -58,7 +59,14 @@ export function Sidebar() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversationId]);
 
-  const { today, yesterday, older } = groupConversations(conversations);
+  // Filter conversations by search query
+  const filtered = searchQuery.trim()
+    ? conversations.filter((c) =>
+        (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : conversations;
+
+  const { today, yesterday, older } = groupConversations(filtered);
 
   function ConvGroup({ label, items }: { label: string; items: Conversation[] }) {
     if (items.length === 0) return null;
@@ -123,10 +131,26 @@ export function Sidebar() {
         </Link>
       </div>
 
+      {/* Search bar */}
+      <div className="px-3 pb-2">
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface-2 border border-white/8">
+          <Search className="w-3.5 h-3.5 text-white/30 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search conversations…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-transparent text-xs text-white/70 placeholder:text-white/25 outline-none w-full"
+          />
+        </div>
+      </div>
+
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto">
         {conversations.length === 0 ? (
           <p className="text-xs text-gray-600 px-4 py-3">No conversations yet.</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-xs text-gray-600 px-4 py-3">No results for &quot;{searchQuery}&quot;</p>
         ) : (
           <>
             <ConvGroup label="Today" items={today} />

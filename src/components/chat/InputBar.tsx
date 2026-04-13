@@ -1,10 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowUp, Square, Paperclip, Mic } from "lucide-react";
-import { ModelSelector } from "@/components/chat/ModelSelector";
-import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
-import { useUIStore } from "@/stores/uiStore";
+import { ArrowUp, Square, Paperclip, Plug } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface InputBarProps {
@@ -12,12 +9,13 @@ interface InputBarProps {
   onStop: () => void;
   isStreaming: boolean;
   disabled?: boolean;
+  enableConnectors?: boolean;
+  onToggleConnectors?: () => void;
 }
 
-export function InputBar({ onSend, onStop, isStreaming, disabled }: InputBarProps) {
+export function InputBar({ onSend, onStop, isStreaming, disabled, enableConnectors, onToggleConnectors }: InputBarProps) {
   const [value, setValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const setVoiceModalOpen = useUIStore((s) => s.setVoiceModalOpen);
 
   const charCount = value.length;
 
@@ -56,10 +54,9 @@ export function InputBar({ onSend, onStop, isStreaming, disabled }: InputBarProp
 
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 pb-2 pt-1">
-        {/* Left: model, thinking, file, voice */}
+        {/* Left: file attach */}
         <div className="flex items-center gap-1">
-          <ModelSelector />
-          <ThinkingToggle />
+          {/* File attach */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -68,14 +65,7 @@ export function InputBar({ onSend, onStop, isStreaming, disabled }: InputBarProp
           >
             <Paperclip size={14} />
           </button>
-          <button
-            type="button"
-            onClick={() => setVoiceModalOpen(true)}
-            className="h-7 w-7 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-300 hover:bg-surface-2 transition-colors"
-            title="Voice input"
-          >
-            <Mic size={14} />
-          </button>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -85,6 +75,23 @@ export function InputBar({ onSend, onStop, isStreaming, disabled }: InputBarProp
               // File upload handled in Phase 5
             }}
           />
+
+          {/* Connector toggle */}
+          {onToggleConnectors && (
+            <button
+              type="button"
+              onClick={onToggleConnectors}
+              className={cn(
+                "h-7 w-7 flex items-center justify-center rounded-md transition-colors",
+                enableConnectors
+                  ? "text-surya-500 bg-surya-500/10 hover:bg-surya-500/20"
+                  : "text-gray-500 hover:text-gray-300 hover:bg-surface-2"
+              )}
+              title={enableConnectors ? "Disable workspace connectors" : "Enable workspace connectors"}
+            >
+              <Plug size={14} />
+            </button>
+          )}
         </div>
 
         {/* Right: char count + send/stop */}

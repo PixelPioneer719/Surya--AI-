@@ -1,5 +1,3 @@
-import type { ModelKey } from "@/lib/ai/models";
-
 export type MessageRole = "user" | "assistant" | "system";
 
 export interface ArtifactType {
@@ -15,9 +13,10 @@ export interface Message {
   conversationId: string;
   role: MessageRole;
   content: string;
-  artifacts: ArtifactType[];
+  artifacts?: ArtifactType[];
   thinking?: string;
   tokens?: number;
+  /** DB stores this as `timestamp` — aliased here for compat */
   createdAt: string;
 }
 
@@ -25,7 +24,8 @@ export interface Conversation {
   id: string;
   userId: string;
   title: string;
-  model: ModelKey;
+  /** Auto-selected model stored at conversation level for reference */
+  model?: string;
   projectId?: string;
   messages?: Message[];
   updatedAt: string;
@@ -35,7 +35,8 @@ export interface Conversation {
 export interface ChatRequest {
   conversationId?: string;
   message: string;
-  model?: ModelKey;
+  /** Model is now auto-selected server-side — this field is ignored */
+  model?: string;
   projectId?: string;
   thinking?: boolean;
   enableConnectors?: boolean;

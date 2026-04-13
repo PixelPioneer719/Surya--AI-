@@ -14,7 +14,7 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ conversationId, projectId }: ChatInterfaceProps) {
-  const { messages, isStreaming, streamingContent, sendMessage, stopStreaming } = useChat(projectId);
+  const { messages, isStreaming, streamingContent, sendMessage, stopStreaming, enableConnectors, setEnableConnectors } = useChat(projectId);
   const { setMessages, setActiveConversation, activeConversationId } = useChatStore();
   const { artifactPanelOpen } = useUIStore();
 
@@ -55,11 +55,13 @@ export function ChatInterface({ conversationId, projectId }: ChatInterfaceProps)
           streamingContent={streamingContent}
         />
 
-        <div className={`px-4 pb-4 pt-2 w-full ${artifactPanelOpen ? "max-w-2xl" : "max-w-3xl"} mx-auto`}>
+        <div className={`px-4 pb-6 pt-2 w-full ${artifactPanelOpen ? "max-w-2xl" : "max-w-3xl"} mx-auto`}>
           <InputBar
             onSend={(content) => sendMessage(content, conversationId)}
             onStop={stopStreaming}
             isStreaming={isStreaming}
+            enableConnectors={enableConnectors}
+            onToggleConnectors={() => setEnableConnectors(!enableConnectors)}
           />
         </div>
       </div>

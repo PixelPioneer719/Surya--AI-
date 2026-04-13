@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { PanelLeft } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,10 @@ export function Header() {
         <PanelLeft size={16} />
       </Button>
 
-      <span className="flex-1 text-sm font-medium text-gray-300 truncate">
+      <span className="flex-1 flex items-center gap-2 text-sm font-medium text-gray-300 truncate">
+        {!activeTitle && (
+          <Image src="/logo.png" alt="Surya AI" width={20} height={20} className="rounded-sm shrink-0" />
+        )}
         {activeTitle ?? "Surya AI"}
       </span>
 

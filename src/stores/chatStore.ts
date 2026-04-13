@@ -1,7 +1,5 @@
 import { create } from "zustand";
 import type { Conversation, Message } from "@/types/chat";
-import type { ModelKey } from "@/lib/ai/models";
-import { DEFAULT_MODEL } from "@/lib/ai/models";
 
 interface ChatStore {
   conversations: Conversation[];
@@ -9,8 +7,10 @@ interface ChatStore {
   messages: Message[];
   isStreaming: boolean;
   streamingContent: string;
-  selectedModel: ModelKey;
+  /** Deep thinking — when true, server routes to Opus automatically */
   thinkingEnabled: boolean;
+  /** When true, Claude is given tool definitions to call Google/GitHub connectors */
+  enableConnectors: boolean;
 
   setConversations: (conversations: Conversation[]) => void;
   setActiveConversation: (id: string | null) => void;
@@ -18,8 +18,8 @@ interface ChatStore {
   addMessage: (message: Message) => void;
   updateStreamingContent: (content: string) => void;
   setIsStreaming: (isStreaming: boolean) => void;
-  setSelectedModel: (model: ModelKey) => void;
   setThinkingEnabled: (enabled: boolean) => void;
+  setEnableConnectors: (enabled: boolean) => void;
   resetStream: () => void;
 }
 
@@ -29,8 +29,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   messages: [],
   isStreaming: false,
   streamingContent: "",
-  selectedModel: DEFAULT_MODEL,
   thinkingEnabled: false,
+  enableConnectors: false,
 
   setConversations: (conversations) => set({ conversations }),
   setActiveConversation: (id) => set({ activeConversationId: id }),
@@ -38,7 +38,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   addMessage: (message) => set((s) => ({ messages: [...s.messages, message] })),
   updateStreamingContent: (content) => set({ streamingContent: content }),
   setIsStreaming: (isStreaming) => set({ isStreaming }),
-  setSelectedModel: (selectedModel) => set({ selectedModel }),
   setThinkingEnabled: (thinkingEnabled) => set({ thinkingEnabled }),
+  setEnableConnectors: (enableConnectors) => set({ enableConnectors }),
   resetStream: () => set({ streamingContent: "", isStreaming: false }),
 }));

@@ -17,7 +17,13 @@ export const metadata: Metadata = {
   title: "Surya AI — The AI that thinks with you",
   description:
     "Production-grade AI assistant. Chat, research, build apps, and automate your work.",
-  icons: { icon: "/logo.png", apple: "/logo.png" },
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png" },
+    ],
+    apple: "/logo.png",
+    shortcut: "/logo.png",
+  },
 };
 
 export default function RootLayout({
