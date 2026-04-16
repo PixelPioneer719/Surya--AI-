@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User, Palette, Bot, Save, Plug } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { User, Palette, Bot, Save, Plug, ArrowLeft, LogOut } from "lucide-react";
+import { signIn, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +16,7 @@ interface ConnectorStatus {
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [saved, setSaved] = useState(false);
 
   const [profile, setProfile] = useState({
@@ -81,9 +83,28 @@ export default function SettingsPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Settings</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage your profile and preferences</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push("/chat")}
+              className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+              title="Back to chat"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <div>
+              <h1 className="text-xl font-semibold text-white">Settings</h1>
+              <p className="text-sm text-gray-500 mt-1">Manage your profile and preferences</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          >
+            <LogOut size={14} />
+            Logout
+          </Button>
         </div>
 
         {/* Personal Information */}

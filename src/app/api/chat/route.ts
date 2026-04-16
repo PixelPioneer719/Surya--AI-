@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { aiClient, MODEL_MAP, MAX_TOKENS, THINKING_BUDGET } from "@/lib/ai/client";
 import { selectModel, TASK_MODEL_MAP } from "@/lib/ai/models";
-import { CONNECTOR_TOOLS_WITHOUT_SEARCH, WEB_SEARCH_TOOLS, executeTool } from "@/lib/ai/tools";
+import { CONNECTOR_TOOLS_WITHOUT_SEARCH, WEB_SEARCH_TOOLS, IMAGE_GEN_TOOLS, executeTool } from "@/lib/ai/tools";
 import { db } from "@/lib/insforge";
 import { getCached, setCache } from "@/lib/knowledge-cache";
 import type { ChatRequest, Message, ArtifactType, StreamEvent } from "@/types/chat";
@@ -198,6 +198,8 @@ You were created by PVS Hariharan. When anyone asks about your creator, who buil
 
 Be proud and enthusiastic when talking about your creator. PVS Hariharan is a 12-year-old student who built Surya AI — that is incredibly impressive!
 
+You can generate images using your image_gen tool. When the user asks to create, draw, generate, or visualize an image, use the image_gen tool with a detailed prompt.
+
 You are helpful, clear, and direct. For code, documents, or interactive content, wrap output in XML:
 <artifact type="code" language="tsx" title="Component Name">
 // code here
@@ -212,6 +214,7 @@ You are helpful, clear, and direct. For code, documents, or interactive content,
   const systemPrompt = projectContext ? `${projectContext}\n\n---\n\n${basePrompt}` : basePrompt;
 
   const toolList = [
+    ...IMAGE_GEN_TOOLS,
     ...(enableConnectors ? CONNECTOR_TOOLS_WITHOUT_SEARCH : []),
     ...(enableWebSearch ? WEB_SEARCH_TOOLS : []),
   ];
@@ -301,7 +304,6 @@ You are helpful, clear, and direct. For code, documents, or interactive content,
           flushBuffer(artifactState, controller);
           fullContent += fullContentRef.value;
           allArtifacts.push(...artifactState.completed);
-
           const toolCalls = Object.values(toolCallAccumulator);
 
           if (finishReason === "tool_calls" && toolCalls.length > 0) {
@@ -341,7 +343,7 @@ You are helpful, clear, and direct. For code, documents, or interactive content,
                 content: result,
               });
 
-              // web_search post-processing: emit citation cards + switch synthesis model
+              // web_search post-processing: emit citation cards
               if (tc.name === "web_search") {
                 try {
                   const parsed = JSON.parse(result);
@@ -349,8 +351,7 @@ You are helpful, clear, and direct. For code, documents, or interactive content,
                     send(controller, { type: "search_results", searchResults: parsed.results });
                   }
                 } catch { /* ignore parse errors */ }
-                // Route synthesis to Gemini
-                effectiveModel = MODEL_MAP[TASK_MODEL_MAP.webSearch];
+                // Keep using the same model for synthesis (Gemini streaming is incompatible)
               }
 
               // Append tool result to messages
@@ -394,6 +395,7 @@ You are helpful, clear, and direct. For code, documents, or interactive content,
 
         send(controller, { type: "done", content: convId });
       } catch (err) {
+        console.error("[chat] Unhandled error:", err);
         const msg = err instanceof Error ? err.message : "Unknown error";
         send(controller, { type: "error", error: msg });
       } finally {

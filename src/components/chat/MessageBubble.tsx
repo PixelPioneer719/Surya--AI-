@@ -4,7 +4,8 @@ import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { ChevronDown, ChevronRight, Brain, Code2, FileText, Play } from "lucide-react";
+import { ChevronDown, ChevronRight, Brain, Code2, FileText, Play, Sparkles } from "lucide-react";
+import { CitationCard } from "./CitationCard";
 import { StreamingText } from "./StreamingText";
 import type { Message, ArtifactType } from "@/types/chat";
 import { useUIStore } from "@/stores/uiStore";
@@ -131,6 +132,26 @@ export const MessageBubble = memo(function MessageBubble({
             {message.artifacts.map((artifact) => (
               <ArtifactChip key={artifact.id} artifact={artifact} />
             ))}
+          </div>
+        )}
+
+        {/* Powered by Gemini badge — shown for research document artifacts */}
+        {!isUser && message.artifacts?.some(a => a.type === "document" && a.title.startsWith("Research:")) && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <Sparkles size={10} className="text-surya-accent" />
+            <span className="text-[10px] text-surya-accent font-medium tracking-wide">Powered by Gemini</span>
+          </div>
+        )}
+
+        {/* Citation cards strip — shown for web search results */}
+        {!isUser && message.searchResults && message.searchResults.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/5">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 font-medium">Sources</p>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {message.searchResults.map((result) => (
+                <CitationCard key={result.index} result={result} compact />
+              ))}
+            </div>
           </div>
         )}
       </div>

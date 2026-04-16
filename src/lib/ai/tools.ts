@@ -245,6 +245,26 @@ export const CONNECTOR_TOOLS = [
       },
     },
   },
+
+  // Image Generation
+  {
+    type: "function",
+    function: {
+      name: "image_gen",
+      description:
+        "Generate an image from a text description using AI. Use when the user asks to create, draw, generate, or visualize an image.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: {
+            type: "string",
+            description: "Detailed description of the image to generate",
+          },
+        },
+        required: ["prompt"],
+      },
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -261,6 +281,7 @@ const TOOL_ROUTE_MAP: Record<string, { path: string; action: string }> = {
   calendar_list_events:   { path: "/api/connectors/calendar", action: "list_events" },
   calendar_create_event:  { path: "/api/connectors/calendar", action: "create_event" },
   docs_read:              { path: "/api/connectors/docs",     action: "read" },
+  image_gen:              { path: "/api/image-gen",           action: "generate" },
   github_list_repos:      { path: "/api/connectors/github",   action: "list_repos" },
   github_list_issues:     { path: "/api/connectors/github",   action: "list_issues" },
   github_create_issue:    { path: "/api/connectors/github",   action: "create_issue" },
@@ -275,9 +296,14 @@ export const WEB_SEARCH_TOOLS = CONNECTOR_TOOLS.filter(
   (t) => t.function.name === "web_search"
 );
 
-/** All connector tools except web_search — combined with WEB_SEARCH_TOOLS when both flags are on */
+/** All connector tools except web_search and image_gen — those are added separately */
 export const CONNECTOR_TOOLS_WITHOUT_SEARCH = CONNECTOR_TOOLS.filter(
-  (t) => t.function.name !== "web_search"
+  (t) => t.function.name !== "web_search" && t.function.name !== "image_gen"
+);
+
+/** Only the image_gen tool */
+export const IMAGE_GEN_TOOLS = CONNECTOR_TOOLS.filter(
+  (t) => t.function.name === "image_gen"
 );
 
 // ---------------------------------------------------------------------------

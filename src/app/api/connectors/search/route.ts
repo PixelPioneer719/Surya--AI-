@@ -1,7 +1,6 @@
 import { auth } from "@/auth";
 import * as cheerio from "cheerio";
 import { isSafeUrl, normalizeSearchResults } from "@/lib/web-utils";
-import type { SearchResult } from "@/types/chat";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -23,31 +22,69 @@ export async function POST(req: Request) {
         return Response.json({ error: "query is required" }, { status: 400 });
       }
 
-      const res = await fetch(
-        `${process.env.WEB_SEARCH_API_URL}/functions/v1/web-search`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.WEB_SEARCH_API_KEY}`,
-            apikey: process.env.WEB_SEARCH_ANON_KEY ?? "",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ query, limit: limit ?? 5 }),
-        }
-      );
+      const cap = limit ?? 5;
 
-      if (!res.ok) {
-        const text = await res.text();
-        return Response.json(
-          { error: `Search API error ${res.status}: ${text}` },
-          { status: 502 }
+      // Primary: Brave Search API (if key is configured)
+      if (process.env.BRAVE_SEARCH_API_KEY) {
+        const braveRes = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${cap}`,
+          {
+            headers: {
+              Accept: "application/json",
+              "Accept-Encoding": "gzip",
+              "X-Subscription-Token": process.env.BRAVE_SEARCH_API_KEY,
+            },
+            signal: AbortSignal.timeout(8000),
+          }
         );
+        if (braveRes.ok) {
+          const data = await braveRes.json();
+          const results = normalizeSearchResults(data.web?.results ?? [], cap);
+          return Response.json({ results });
+        }
       }
 
-      const data = await res.json();
-      const raw: unknown[] = data.results ?? data.data ?? (Array.isArray(data) ? data : []);
-      const results: SearchResult[] = normalizeSearchResults(raw, limit ?? 5);
+      // Fallback: DuckDuckGo HTML scraping (free, no API key)
+      const params = new URLSearchParams({ q: query });
+      const ddgRes = await fetch(`https://html.duckduckgo.com/html/?${params}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; SuryaAI/1.0)",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        signal: AbortSignal.timeout(8000),
+      });
 
+      if (!ddgRes.ok) {
+        return Response.json({ results: [] });
+      }
+
+      const html = await ddgRes.text();
+      const $d = cheerio.load(html);
+      const rawDDG: Array<{ title: string; url: string; snippet: string }> = [];
+
+      $d(".result").each((_i, el) => {
+        if (rawDDG.length >= cap) return false;
+        const title = $d(el).find(".result__title").text().trim();
+        const snippet = $d(el).find(".result__snippet").text().trim();
+        const href = $d(el).find(".result__title a").attr("href") ?? "";
+        const urlText = $d(el).find(".result__url").text().trim();
+
+        // DDG wraps destination URLs — extract the real URL
+        let resultUrl = "";
+        if (href.includes("uddg=")) {
+          try {
+            resultUrl = decodeURIComponent(href.split("uddg=")[1].split("&")[0]);
+          } catch {
+            resultUrl = urlText ? `https://${urlText}` : "";
+          }
+        } else if (urlText) {
+          resultUrl = `https://${urlText}`;
+        }
+
+        if (title && resultUrl) rawDDG.push({ title, url: resultUrl, snippet });
+      });
+
+      const results = normalizeSearchResults(rawDDG, cap);
       return Response.json({ results });
     }
 

@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useChat } from "@/hooks/useChat";
+import { useResearch } from "@/hooks/useResearch";
 import { useChatStore } from "@/stores/chatStore";
 import { MessageList } from "@/components/chat/MessageList";
 import { InputBar } from "@/components/chat/InputBar";
 import { ArtifactPanel } from "@/components/artifacts/ArtifactPanel";
+import { ResearchProgress } from "@/components/chat/ResearchProgress";
 import { useUIStore } from "@/stores/uiStore";
+import type { Message } from "@/types/chat";
 
 interface ChatInterfaceProps {
   conversationId?: string;
@@ -14,13 +18,36 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ conversationId, projectId }: ChatInterfaceProps) {
-  const { messages, isStreaming, streamingContent, sendMessage, stopStreaming, enableConnectors, setEnableConnectors } = useChat(projectId);
-  const { setMessages, setActiveConversation, activeConversationId } = useChatStore();
+  const router = useRouter();
+
+  const {
+    messages,
+    isStreaming,
+    streamingContent,
+    sendMessage,
+    stopStreaming,
+    enableConnectors,
+    setEnableConnectors,
+    enableWebSearch,
+    setEnableWebSearch,
+  } = useChat(projectId);
+
+  const {
+    isRunning: isResearching,
+    stage: researchStage,
+    detail: researchDetail,
+    completedArtifact,
+    error: researchError,
+    resultConversationId,
+    startResearch,
+    reset: resetResearch,
+  } = useResearch();
+
+  const { setMessages, setActiveConversation, activeConversationId, addMessage } = useChatStore();
   const { artifactPanelOpen } = useUIStore();
 
   useEffect(() => {
     if (!conversationId) {
-      // New chat — reset state
       setMessages([]);
       setActiveConversation(null);
       return;
@@ -30,7 +57,6 @@ export function ChatInterface({ conversationId, projectId }: ChatInterfaceProps)
 
     setActiveConversation(conversationId);
 
-    // Load messages from API
     fetch(`/api/conversations/${conversationId}/messages`)
       .then((r) => {
         if (!r.ok) throw new Error(`${r.status}`);
@@ -45,6 +71,28 @@ export function ChatInterface({ conversationId, projectId }: ChatInterfaceProps)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
+  // Commit completed research artifact into chat message store
+  useEffect(() => {
+    if (!completedArtifact) return;
+
+    const researchMsg: Message = {
+      id: crypto.randomUUID(),
+      conversationId: resultConversationId ?? conversationId ?? "",
+      role: "assistant",
+      content: completedArtifact.content,
+      artifacts: [completedArtifact],
+      createdAt: new Date().toISOString(),
+    };
+    addMessage(researchMsg);
+
+    if (resultConversationId && resultConversationId !== conversationId && !projectId) {
+      router.replace(`/chat/${resultConversationId}`);
+    }
+
+    resetResearch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedArtifact]);
+
   return (
     <div className="relative flex h-full overflow-hidden">
       {/* Chat column */}
@@ -55,13 +103,30 @@ export function ChatInterface({ conversationId, projectId }: ChatInterfaceProps)
           streamingContent={streamingContent}
         />
 
+        {/* Deep Research progress — animated stages */}
+        <ResearchProgress
+          stage={researchStage}
+          detail={researchDetail}
+          isRunning={isResearching}
+        />
+
+        {/* Research error */}
+        {researchError && !isResearching && (
+          <div className="mx-auto max-w-3xl px-4 mb-2">
+            <p className="text-xs text-red-400 text-center">Research failed: {researchError}</p>
+          </div>
+        )}
+
         <div className={`px-4 pb-6 pt-2 w-full ${artifactPanelOpen ? "max-w-2xl" : "max-w-3xl"} mx-auto`}>
           <InputBar
             onSend={(content) => sendMessage(content, conversationId)}
             onStop={stopStreaming}
-            isStreaming={isStreaming}
+            isStreaming={isStreaming || isResearching}
             enableConnectors={enableConnectors}
             onToggleConnectors={() => setEnableConnectors(!enableConnectors)}
+            enableWebSearch={enableWebSearch}
+            onToggleWebSearch={() => setEnableWebSearch(!enableWebSearch)}
+            onDeepResearch={(question) => startResearch(question, conversationId, projectId)}
           />
         </div>
       </div>

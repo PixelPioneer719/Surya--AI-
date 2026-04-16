@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, Settings, MessageSquare, FolderOpen, Search } from "lucide-react";
+import { Plus, Settings, MessageSquare, FolderOpen, Search, Code2 } from "lucide-react";
 import { formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useChatStore } from "@/stores/chatStore";
@@ -128,6 +128,18 @@ export function Sidebar() {
         >
           <FolderOpen size={15} />
           Projects
+        </Link>
+        <Link
+          href="/app-builder"
+          className={cn(
+            "flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium transition-colors",
+            pathname.startsWith("/app-builder")
+              ? "bg-surface-2 text-white"
+              : "text-gray-500 hover:text-white hover:bg-surface-2/60"
+          )}
+        >
+          <Code2 size={15} />
+          App Builder
         </Link>
       </div>
 

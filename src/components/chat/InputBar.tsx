@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowUp, Square, Paperclip, Plug } from "lucide-react";
+import { ArrowUp, Square, Paperclip, Plug, Globe, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface InputBarProps {
@@ -11,9 +11,12 @@ interface InputBarProps {
   disabled?: boolean;
   enableConnectors?: boolean;
   onToggleConnectors?: () => void;
+  enableWebSearch?: boolean;
+  onToggleWebSearch?: () => void;
+  onDeepResearch?: (question: string) => void;
 }
 
-export function InputBar({ onSend, onStop, isStreaming, disabled, enableConnectors, onToggleConnectors }: InputBarProps) {
+export function InputBar({ onSend, onStop, isStreaming, disabled, enableConnectors, onToggleConnectors, enableWebSearch, onToggleWebSearch, onDeepResearch }: InputBarProps) {
   const [value, setValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -90,6 +93,47 @@ export function InputBar({ onSend, onStop, isStreaming, disabled, enableConnecto
               title={enableConnectors ? "Disable workspace connectors" : "Enable workspace connectors"}
             >
               <Plug size={14} />
+            </button>
+          )}
+
+          {/* Web search toggle */}
+          {onToggleWebSearch && (
+            <button
+              type="button"
+              onClick={onToggleWebSearch}
+              className={cn(
+                "h-7 w-7 flex items-center justify-center rounded-md transition-colors",
+                enableWebSearch
+                  ? "text-surya-500 bg-surya-500/10 hover:bg-surya-500/20"
+                  : "text-gray-500 hover:text-gray-300 hover:bg-surface-2"
+              )}
+              title={enableWebSearch ? "Disable web search" : "Enable web search"}
+            >
+              <Globe size={14} />
+            </button>
+          )}
+
+          {/* Deep Research button */}
+          {onDeepResearch && (
+            <button
+              type="button"
+              onClick={() => {
+                const q = value.trim();
+                if (!q || isStreaming || disabled) return;
+                onDeepResearch(q);
+                setValue("");
+              }}
+              disabled={!value.trim() || isStreaming || disabled}
+              className={cn(
+                "h-7 px-2 flex items-center gap-1 rounded-md text-xs font-medium transition-colors",
+                value.trim() && !isStreaming && !disabled
+                  ? "text-surya-accent bg-surya-accent/10 hover:bg-surya-accent/20"
+                  : "text-gray-600 cursor-not-allowed"
+              )}
+              title="Deep Research — comprehensive multi-source synthesis"
+            >
+              <FlaskConical size={12} />
+              <span>Research</span>
             </button>
           )}
         </div>

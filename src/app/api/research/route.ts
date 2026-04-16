@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
             { role: "user", content: question },
           ],
           stream: false,
-          max_tokens: 600,
+          maxTokens: 600,
         });
 
         let subQueries: string[] = [];
@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
             },
           ],
           stream: true,
-          max_tokens: 16000,
+          maxTokens: 16000,
         });
 
         let fullContent = "";
