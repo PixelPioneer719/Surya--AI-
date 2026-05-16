@@ -53,6 +53,29 @@ export async function POST(req: Request) {
       });
     }
 
+    if (action === "create") {
+      const { title = "Surya AI Export", content = "" } = body;
+      const docs = google.docs({ version: "v1", auth: oauth2Client });
+      const created = await docs.documents.create({ requestBody: { title } });
+      const documentId = created.data.documentId;
+      if (!documentId) {
+        return Response.json({ error: "Document creation returned no ID" }, { status: 502 });
+      }
+      if (content) {
+        await docs.documents.batchUpdate({
+          documentId,
+          requestBody: {
+            requests: [{ insertText: { location: { index: 1 }, text: content } }],
+          },
+        });
+      }
+      return Response.json({
+        url: `https://docs.google.com/document/d/${documentId}/edit`,
+        documentId,
+        title,
+      });
+    }
+
     return new Response(`Unknown action: ${action}`, { status: 400 });
   } catch (err) {
     if (isConnectorError(err)) {

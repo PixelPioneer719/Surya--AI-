@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { PanelLeft } from "lucide-react";
+import { PanelLeft, Bug } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/stores/uiStore";
@@ -34,6 +34,25 @@ export function Header() {
         )}
         {activeTitle ?? "Surya AI"}
       </span>
+
+      <button
+        onClick={() => {
+          const subject = encodeURIComponent("Bug Report — Surya AI");
+          const body = encodeURIComponent(
+            `Hi PVS Hariharan,\n\nI found a bug on Surya AI:\n\n[Describe the bug here]\n\nSteps to reproduce:\n1. \n2. \n3. \n\nExpected behavior:\n\nActual behavior:\n\nBrowser / device:\n\nThanks!`
+          );
+          window.open(
+            `https://mail.google.com/mail/?view=cm&fs=1&to=pvshariharan324@gmail.com&su=${subject}&body=${body}`,
+            "_blank",
+            "noopener,noreferrer"
+          );
+        }}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white bg-white/[0.04] hover:bg-surface-2 border border-white/8 transition-colors"
+        title="Report a bug — opens Gmail"
+      >
+        <Bug size={12} className="text-red-400" />
+        Report Bug
+      </button>
 
       <Link href="/settings">
         <Avatar className="w-7 h-7">
