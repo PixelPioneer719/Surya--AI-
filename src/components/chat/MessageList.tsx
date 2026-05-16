@@ -10,9 +10,10 @@ interface MessageListProps {
   messages: Message[];
   isStreaming: boolean;
   streamingContent: string;
+  onEditMessage?: (messageId: string, newContent: string) => void;
 }
 
-export function MessageList({ messages, isStreaming, streamingContent }: MessageListProps) {
+export function MessageList({ messages, isStreaming, streamingContent, onEditMessage }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const wasStreamingRef = useRef(false);
 
@@ -49,7 +50,7 @@ export function MessageList({ messages, isStreaming, streamingContent }: Message
     <ScrollArea className="flex-1 px-4">
       <div className="max-w-3xl mx-auto py-4">
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+          <MessageBubble key={msg.id} message={msg} onEdit={onEditMessage} />
         ))}
 
         {/* Streaming assistant message */}
